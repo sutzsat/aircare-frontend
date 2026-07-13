@@ -1,0 +1,507 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { Wind, Check, Camera, X } from "lucide-react";
+import { AirGauge } from "@/components/AirGauge";
+import {
+  ApiError,
+  Rating,
+  getBrowserLocation,
+  getPublicConfig,
+  registerMobile,
+  requestEscalationOtp,
+  requestSelfCheck,
+  submitFeedback,
+  requestPhotoUploadUrl,
+  uploadPhotoToS3,
+  validateRo,
+  verifyEscalationOtp,
+  verifySelfCheck,
+} from "@/lib/api";
+
+const MAX_PHOTO_BYTES = 5 * 1024 * 1024;
+const ALLOWED_PHOTO_TYPES = ["image/jpeg", "image/png"];
+
+type Step = "loading" | "invalid" | "mobile" | "selfcheck" | "escalation" | "gps_escalation" | "rating" | "submitting" | "done" | "error";
+
+const RATING_OPTIONS: { value: Rating; label: string; gauge: number }[] = [
+  { value: "NOT_SATISFIED", label: "Not Satisfied", gauge: 15 },
+  { value: "NEUTRAL", label: "Neutral", gauge: 50 },
+  { value: "SATISFIED", label: "Satisfied", gauge: 85 },
+];
+
+export function FeedbackFlow({ roCode }: { roCode: string }) {
+  const [step, setStep] = useState<Step>("loading");
+  const [roName, setRoName] = useState("");
+  const [mobile, setMobile] = useState("");
+  const [challengeId, setChallengeId] = useState("");
+  const [confirmed, setConfirmed] = useState(false);
+  const [honeypot, setHoneypot] = useState(""); // must stay empty -- a human never fills this
+  const [escalationOtp, setEscalationOtp] = useState("");
+  const [sessionToken, setSessionToken] = useState("");
+  const [rating, setRating] = useState<Rating | null>(null);
+  const [comment, setComment] = useState("");
+  const [errorMessage, setErrorMessage] = useState("");
+  const [submittedRatingGauge, setSubmittedRatingGauge] = useState(50);
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [photoPreviewUrl, setPhotoPreviewUrl] = useState<string | null>(null);
+  const [photoError, setPhotoError] = useState("");
+  const [selfCheckEnabled, setSelfCheckEnabled] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    Promise.all([validateRo(roCode), getPublicConfig().catch(() => null)])
+      .then(([roRes, configRes]) => {
+        if (!roRes.data.is_active) {
+          setStep("invalid");
+          return;
+        }
+        setRoName(roRes.data.ro_name);
+        setSelfCheckEnabled(configRes?.data.self_check_enabled ?? false);
+        setStep("mobile");
+      })
+      .catch(() => setStep("invalid"));
+  }, [roCode]);
+
+  async function loadSelfCheck() {
+    setErrorMessage("");
+    try {
+      const res = await requestSelfCheck();
+      setChallengeId(res.data.challenge_id);
+      setConfirmed(false);
+      setHoneypot("");
+    } catch {
+      setErrorMessage("Something went wrong. Check your connection and try again.");
+    }
+  }
+
+  async function handleContinueToSelfCheck() {
+    if (!/^[6-9]\d{9}$/.test(mobile)) {
+      setErrorMessage("Enter a valid 10-digit mobile number.");
+      return;
+    }
+    setErrorMessage("");
+
+    if (!selfCheckEnabled) {
+      // Self-check disabled (current default) -- register the number
+      // directly and go straight to rating. The duplicate-submission rule
+      // still applies unchanged at actual submission time.
+      try {
+        const res = await registerMobile(mobile, roCode);
+        setSessionToken(res.data.feedback_session_token);
+        setStep("rating");
+      } catch (e) {
+        setErrorMessage(e instanceof ApiError ? e.message : "Please try again.");
+      }
+      return;
+    }
+
+    setStep("selfcheck");
+    await loadSelfCheck();
+  }
+
+  async function handleVerifySelfCheck() {
+    if (!confirmed) {
+      setErrorMessage("Please confirm the checkbox to continue.");
+      return;
+    }
+    setErrorMessage("");
+    try {
+      const res = await verifySelfCheck(challengeId, confirmed, honeypot, mobile, roCode);
+      if (res.data.requires_escalation) {
+        // A false positive here costs the customer one extra WhatsApp step,
+        // never a rejected submission -- see self_check_service.py.
+        setStep("escalation");
+        await requestEscalationOtp(mobile);
+      } else if (res.data.feedback_session_token) {
+        setSessionToken(res.data.feedback_session_token);
+        setStep("rating");
+      }
+    } catch (e) {
+      setErrorMessage(e instanceof ApiError ? e.message : "Please try again.");
+      await loadSelfCheck();
+    }
+  }
+
+  async function handleVerifyEscalation() {
+    setErrorMessage("");
+    try {
+      const res = await verifyEscalationOtp(mobile, escalationOtp, roCode);
+      setSessionToken(res.data.feedback_session_token);
+      setStep("rating");
+    } catch (e) {
+      setErrorMessage(e instanceof ApiError ? e.message : "Incorrect code. Try again.");
+    }
+  }
+
+  function handlePhotoSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    setPhotoError("");
+    if (!file) return;
+
+    if (!ALLOWED_PHOTO_TYPES.includes(file.type)) {
+      setPhotoError("Please choose a JPEG or PNG photo.");
+      return;
+    }
+    if (file.size > MAX_PHOTO_BYTES) {
+      setPhotoError("Photo must be under 5MB.");
+      return;
+    }
+    setPhotoFile(file);
+    setPhotoPreviewUrl(URL.createObjectURL(file));
+  }
+
+  function clearPhoto() {
+    if (photoPreviewUrl) URL.revokeObjectURL(photoPreviewUrl);
+    setPhotoFile(null);
+    setPhotoPreviewUrl(null);
+    setPhotoError("");
+  }
+
+  async function doSubmit(sessionTokenToUse: string) {
+    let photoUrl: string | undefined;
+
+    if (photoFile) {
+      try {
+        const presign = await requestPhotoUploadUrl(photoFile.type, sessionTokenToUse);
+        await uploadPhotoToS3(photoFile, presign.data.upload_url, presign.data.upload_fields);
+        photoUrl = presign.data.photo_url;
+      } catch {
+        setErrorMessage("Photo couldn't be uploaded, but your feedback will still be submitted.");
+      }
+    }
+
+    const location = await getBrowserLocation();
+    await submitFeedback(
+      {
+        ro_code: roCode,
+        rating: rating as Rating,
+        comment: comment.trim() || undefined,
+        photo_url: photoUrl,
+        gps_lat: location?.lat,
+        gps_lng: location?.lng,
+      },
+      sessionTokenToUse
+    );
+  }
+
+  async function handleSubmit() {
+    if (!rating) return;
+    setStep("submitting");
+    setErrorMessage("");
+    try {
+      await doSubmit(sessionToken);
+      const opt = RATING_OPTIONS.find((r) => r.value === rating)!;
+      setSubmittedRatingGauge(opt.gauge);
+      setStep("done");
+    } catch (e) {
+      if (e instanceof ApiError && e.code === "GPS_VERIFICATION_REQUIRED") {
+        // Rating/comment/photo are kept in state (never cleared) -- the
+        // customer's input isn't lost, they just verify their number via
+        // WhatsApp and the same submission is retried automatically.
+        setStep("gps_escalation");
+        try {
+          await requestEscalationOtp(mobile);
+        } catch {
+          setErrorMessage("Could not send verification code. Please try again.");
+        }
+        return;
+      }
+      setErrorMessage(e instanceof ApiError ? e.message : "Submission failed. Please try again.");
+      setStep("rating");
+    }
+  }
+
+  async function handleVerifyGpsEscalation() {
+    setErrorMessage("");
+    setStep("submitting");
+    try {
+      const res = await verifyEscalationOtp(mobile, escalationOtp, roCode);
+      await doSubmit(res.data.feedback_session_token);
+      const opt = RATING_OPTIONS.find((r) => r.value === rating)!;
+      setSubmittedRatingGauge(opt.gauge);
+      setStep("done");
+    } catch (e) {
+      setErrorMessage(e instanceof ApiError ? e.message : "Verification failed. Try again.");
+      setStep("gps_escalation");
+    }
+  }
+
+  if (step === "loading") {
+    return (
+      <Shell>
+        <p className="text-center text-[var(--color-muted)] mt-16">Loading outlet details…</p>
+      </Shell>
+    );
+  }
+
+  if (step === "invalid") {
+    return (
+      <Shell>
+        <div className="text-center mt-16 px-6">
+          <h1 className="font-[var(--font-display)] text-xl font-bold">
+            This outlet is not currently part of the campaign
+          </h1>
+          <p className="text-sm text-[var(--color-muted)] mt-2">
+            Please check with the retail outlet staff, or try again later.
+          </p>
+        </div>
+      </Shell>
+    );
+  }
+
+  return (
+    <Shell>
+      <div className="max-w-md mx-auto px-4 py-6">
+        <div className="text-center mb-5">
+          <div className="text-xs uppercase tracking-wide font-semibold text-[var(--color-orange)]">
+            {roName || "IndianOil Retail Outlet"}
+          </div>
+          <h1 className="font-[var(--font-display)] text-xl font-bold mt-1">
+            How was the Free Air facility?
+          </h1>
+          <p className="text-sm mt-1 text-[var(--color-muted)]">
+            Your feedback drives our excellence.
+          </p>
+        </div>
+
+        {errorMessage && (
+          <div className="mb-4 rounded-lg bg-[var(--color-danger-soft)] text-[var(--color-danger)] text-sm px-3 py-2">
+            {errorMessage}
+          </div>
+        )}
+
+        {step === "mobile" && (
+          <Card>
+            <label className="text-sm font-medium block mb-1.5">Mobile Number</label>
+            <input
+              value={mobile}
+              onChange={(e) => setMobile(e.target.value.replace(/\D/g, "").slice(0, 10))}
+              placeholder="Enter 10-digit mobile number"
+              inputMode="numeric"
+              className="w-full rounded-lg px-3 py-2 text-sm border border-[var(--color-border)]"
+            />
+            <button
+              onClick={handleContinueToSelfCheck}
+              className="mt-3 w-full rounded-lg py-2 text-sm font-semibold text-white bg-[var(--color-orange)]"
+            >
+              Continue
+            </button>
+          </Card>
+        )}
+
+        {step === "selfcheck" && (
+          <Card>
+            {/* Honeypot: invisible to sighted humans and screen readers, but
+                many naive bots fill every field they find. Never
+                display:none, which some bots specifically skip. */}
+            <div
+              style={{ position: "absolute", left: "-9999px", opacity: 0 }}
+              aria-hidden="true"
+            >
+              <label htmlFor="website">Leave this field empty</label>
+              <input
+                id="website"
+                name="website"
+                tabIndex={-1}
+                autoComplete="off"
+                value={honeypot}
+                onChange={(e) => setHoneypot(e.target.value)}
+              />
+            </div>
+
+            <label className="flex items-start gap-2.5 text-sm cursor-pointer">
+              <input
+                type="checkbox"
+                checked={confirmed}
+                onChange={(e) => setConfirmed(e.target.checked)}
+                className="mt-0.5 w-4 h-4 accent-[var(--color-orange)]"
+              />
+              <span>I confirm this feedback is genuine.</span>
+            </label>
+
+            <button
+              onClick={handleVerifySelfCheck}
+              disabled={!confirmed}
+              className="mt-3 w-full rounded-lg py-2 text-sm font-semibold text-white bg-[var(--color-orange)] disabled:opacity-40"
+            >
+              Continue
+            </button>
+          </Card>
+        )}
+
+        {step === "escalation" && (
+          <Card>
+            <p className="text-sm text-[var(--color-muted)] mb-3">
+              We sent a verification code via WhatsApp to your number. Enter it below.
+            </p>
+            <input
+              value={escalationOtp}
+              onChange={(e) => setEscalationOtp(e.target.value.replace(/\D/g, "").slice(0, 6))}
+              placeholder="6-digit code"
+              inputMode="numeric"
+              className="w-full rounded-lg px-3 py-2 text-sm border border-[var(--color-border)]"
+            />
+            <button
+              onClick={handleVerifyEscalation}
+              disabled={!escalationOtp}
+              className="mt-3 w-full rounded-lg py-2 text-sm font-semibold text-white bg-[var(--color-orange)] disabled:opacity-40"
+            >
+              Verify &amp; Continue
+            </button>
+          </Card>
+        )}
+
+        {step === "gps_escalation" && (
+          <Card>
+            <p className="text-sm text-[var(--color-muted)] mb-3">
+              Your location doesn&apos;t match this outlet. We sent a verification code via
+              WhatsApp to confirm it&apos;s really you — your feedback is saved and will submit
+              right after.
+            </p>
+            <input
+              value={escalationOtp}
+              onChange={(e) => setEscalationOtp(e.target.value.replace(/\D/g, "").slice(0, 6))}
+              placeholder="6-digit code"
+              inputMode="numeric"
+              className="w-full rounded-lg px-3 py-2 text-sm border border-[var(--color-border)]"
+            />
+            <button
+              onClick={handleVerifyGpsEscalation}
+              disabled={!escalationOtp}
+              className="mt-3 w-full rounded-lg py-2 text-sm font-semibold text-white bg-[var(--color-orange)] disabled:opacity-40"
+            >
+              Verify &amp; Submit
+            </button>
+          </Card>
+        )}
+
+        {(step === "rating" || step === "submitting") && (
+          <>
+            <Card className="mb-4">
+              <div className="text-sm font-semibold mb-3">Rate your experience</div>
+              <div className="flex gap-2">
+                {RATING_OPTIONS.map((opt) => (
+                  <button
+                    key={opt.value}
+                    onClick={() => setRating(opt.value)}
+                    className="flex-1 rounded-xl p-3 flex flex-col items-center border-2 transition"
+                    style={{
+                      borderColor: rating === opt.value ? "var(--color-orange)" : "var(--color-border)",
+                      backgroundColor: rating === opt.value ? "var(--color-orange-soft)" : "transparent",
+                    }}
+                  >
+                    <AirGauge value={opt.gauge} size={64} />
+                    <span className="text-xs font-medium mt-1">{opt.label}</span>
+                  </button>
+                ))}
+              </div>
+            </Card>
+
+            <Card className="mb-4">
+              <label className="text-sm font-medium block mb-1.5">Tell us more (optional)</label>
+              <textarea
+                rows={3}
+                value={comment}
+                onChange={(e) => setComment(e.target.value.slice(0, 500))}
+                placeholder="Share details about your experience…"
+                className="w-full rounded-lg px-3 py-2 text-sm border border-[var(--color-border)] resize-none"
+              />
+
+              <div className="mt-3 pt-3 border-t border-[var(--color-border)]">
+                {photoPreviewUrl ? (
+                  <div className="flex items-center gap-3">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={photoPreviewUrl}
+                      alt="Selected photo preview"
+                      className="w-16 h-16 rounded-lg object-cover border border-[var(--color-border)]"
+                    />
+                    <div className="flex-1 text-xs text-[var(--color-muted)]">
+                      Photo attached
+                    </div>
+                    <button
+                      onClick={clearPhoto}
+                      className="p-1.5 rounded-full bg-[var(--color-bg)]"
+                      aria-label="Remove photo"
+                    >
+                      <X size={14} />
+                    </button>
+                  </div>
+                ) : (
+                  <label className="flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-lg border border-dashed border-[var(--color-border)] text-[var(--color-muted)] cursor-pointer w-fit">
+                    <Camera size={14} />
+                    Add a photo (if equipment isn&apos;t working)
+                    <input
+                      type="file"
+                      accept="image/jpeg,image/png"
+                      onChange={handlePhotoSelect}
+                      className="hidden"
+                    />
+                  </label>
+                )}
+                {photoError && (
+                  <p className="text-xs mt-1.5 text-[var(--color-danger)]">{photoError}</p>
+                )}
+              </div>
+            </Card>
+
+            <button
+              disabled={!rating || step === "submitting"}
+              onClick={handleSubmit}
+              className="w-full rounded-xl py-3 text-sm font-bold text-white disabled:opacity-40"
+              style={{ backgroundColor: "var(--color-orange)" }}
+            >
+              {step === "submitting" ? "Submitting…" : "Submit Feedback"}
+            </button>
+          </>
+        )}
+
+        {step === "done" && (
+          <div className="text-center py-10">
+            <div className="mx-auto w-16 h-16 rounded-full flex items-center justify-center mb-4 bg-[var(--color-success-soft)]">
+              <Check className="text-[var(--color-success)]" size={28} />
+            </div>
+            <h2 className="font-[var(--font-display)] text-lg font-bold">Thank you!</h2>
+            <p className="text-sm mt-2 text-[var(--color-muted)]">
+              Your feedback for {roName} has been recorded.
+            </p>
+            <div className="flex justify-center mt-6">
+              <AirGauge value={submittedRatingGauge} size={120} />
+            </div>
+          </div>
+        )}
+      </div>
+    </Shell>
+  );
+}
+
+function Shell({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="min-h-screen">
+      <div className="px-4 py-3 flex items-center gap-2" style={{ backgroundColor: "var(--color-navy)" }}>
+        <div className="rounded-full p-1.5" style={{ backgroundColor: "var(--color-orange)" }}>
+          <Wind className="text-white" size={16} />
+        </div>
+        <div>
+          <div className="text-white text-sm font-bold leading-none font-[var(--font-display)]">
+            AirCare Challenge
+          </div>
+          <div className="text-xs leading-none mt-0.5" style={{ color: "#B9C4DA" }}>
+            IndianOil · Odisha
+          </div>
+        </div>
+      </div>
+      {children}
+    </div>
+  );
+}
+
+function Card({ children, className = "" }: { children: React.ReactNode; className?: string }) {
+  return (
+    <div
+      className={`rounded-2xl p-4 bg-[var(--color-card)] border border-[var(--color-border)] ${className}`}
+    >
+      {children}
+    </div>
+  );
+}
