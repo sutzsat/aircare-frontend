@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#0f172a" />
+    <title>AirCare Feedback</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <section class="hero-card">
+        <div class="hero-copy">
+          <p class="eyebrow">AirCare customer feedback</p>
+          <h1 id="outletTitle">Loading outlet details...</h1>
+          <p id="outletSubtitle" class="subtitle">
+            Scan the QR, enter your mobile number, and submit your rating in under a minute.
+          </p>
+          <div class="stepper">
+            <span class="step active">1. Mobile</span>
+            <span class="step">2. Smiley survey</span>
+          </div>
+        </div>
+        <div class="hero-badge">
+          <span>Free air pump</span>
+          <strong>Customer voice</strong>
+        </div>
+      </section>
+
+      <section class="content-grid">
+        <article class="panel">
+          <div class="panel-header">
+            <div>
+              <p class="panel-label">Step 1</p>
+              <h2>Start here</h2>
+            </div>
+            <span class="status-pill" id="availabilityPill">Checking outlet</span>
+          </div>
+
+          <form id="mobileForm" class="form-stack">
+            <label>
+              Mobile number
+              <input id="mobileNumber" name="mobileNumber" type="tel" inputmode="numeric" placeholder="9876543210" maxlength="10" />
+            </label>
+            <button class="primary" type="submit">Continue</button>
+          </form>
+
+          <div class="helper-text" id="mobileHelp">
+            We use your mobile number only to enforce one feedback per day.
+          </div>
+        </article>
+
+        <article class="panel panel-wide">
+          <div class="panel-header">
+            <div>
+              <p class="panel-label">Step 2</p>
+              <h2>Rate the free air service</h2>
+            </div>
+            <span class="status-pill muted" id="sessionStatus">Waiting for mobile number</span>
+          </div>
+
+          <form id="feedbackForm" class="form-stack disabled">
+            <div class="survey-stack">
+              <fieldset class="survey-card">
+                <legend>Availability of air facility</legend>
+                <div class="rating-grid">
+                  <label class="rating-option smiley-option"><input type="radio" name="airAvailabilityRating" value="SATISFIED" /><span class="smiley-face happy" aria-hidden="true">☺</span><span><strong>Available</strong><small>Facility was available when needed.</small></span></label>
+                  <label class="rating-option smiley-option"><input type="radio" name="airAvailabilityRating" value="NEUTRAL" /><span class="smiley-face neutral" aria-hidden="true">◐</span><span><strong>Partly available</strong><small>Available with some delay or issue.</small></span></label>
+                  <label class="rating-option smiley-option"><input type="radio" name="airAvailabilityRating" value="NOT_SATISFIED" /><span class="smiley-face sad" aria-hidden="true">☹</span><span><strong>Not available</strong><small>Facility was unavailable.</small></span></label>
+                </div>
+              </fieldset>
+
+              <fieldset class="survey-card">
+                <legend>Functionality of air gauge and equipment</legend>
+                <div class="rating-grid">
+                  <label class="rating-option smiley-option"><input type="radio" name="airEquipmentRating" value="SATISFIED" /><span class="smiley-face happy" aria-hidden="true">☺</span><span><strong>Working well</strong><small>Gauge, compressor, and hose worked properly.</small></span></label>
+                  <label class="rating-option smiley-option"><input type="radio" name="airEquipmentRating" value="NEUTRAL" /><span class="smiley-face neutral" aria-hidden="true">◐</span><span><strong>Usable</strong><small>Worked but not smoothly.</small></span></label>
+                  <label class="rating-option smiley-option"><input type="radio" name="airEquipmentRating" value="NOT_SATISFIED" /><span class="smiley-face sad" aria-hidden="true">☹</span><span><strong>Not working</strong><small>Equipment was faulty or unusable.</small></span></label>
+                </div>
+              </fieldset>
+
+              <fieldset class="survey-card">
+                <legend>Promptness of service</legend>
+                <div class="rating-grid">
+                  <label class="rating-option smiley-option"><input type="radio" name="airPromptnessRating" value="SATISFIED" /><span class="smiley-face happy" aria-hidden="true">☺</span><span><strong>Prompt</strong><small>Service was provided quickly.</small></span></label>
+                  <label class="rating-option smiley-option"><input type="radio" name="airPromptnessRating" value="NEUTRAL" /><span class="smiley-face neutral" aria-hidden="true">◐</span><span><strong>Average</strong><small>Service took some waiting time.</small></span></label>
+                  <label class="rating-option smiley-option"><input type="radio" name="airPromptnessRating" value="NOT_SATISFIED" /><span class="smiley-face sad" aria-hidden="true">☹</span><span><strong>Slow</strong><small>Service was delayed or unattended.</small></span></label>
+                </div>
+              </fieldset>
+
+              <fieldset class="survey-card">
+                <legend>Attendant behaviour and assistance</legend>
+                <div class="rating-grid">
+                  <label class="rating-option smiley-option"><input type="radio" name="airAttendantRating" value="SATISFIED" /><span class="smiley-face happy" aria-hidden="true">☺</span><span><strong>Helpful</strong><small>Attendant was courteous and supportive.</small></span></label>
+                  <label class="rating-option smiley-option"><input type="radio" name="airAttendantRating" value="NEUTRAL" /><span class="smiley-face neutral" aria-hidden="true">◐</span><span><strong>Okay</strong><small>Behaviour was acceptable.</small></span></label>
+                  <label class="rating-option smiley-option"><input type="radio" name="airAttendantRating" value="NOT_SATISFIED" /><span class="smiley-face sad" aria-hidden="true">☹</span><span><strong>Poor</strong><small>Behaviour or assistance was unsatisfactory.</small></span></label>
+                </div>
+              </fieldset>
+
+              <fieldset class="survey-card">
+                <legend>Overall free air experience</legend>
+                <div class="rating-grid">
+                  <label class="rating-option smiley-option"><input type="radio" name="airOverallRating" value="SATISFIED" /><span class="smiley-face happy" aria-hidden="true">☺</span><span><strong>Satisfied</strong><small>Overall experience was good.</small></span></label>
+                  <label class="rating-option smiley-option"><input type="radio" name="airOverallRating" value="NEUTRAL" /><span class="smiley-face neutral" aria-hidden="true">◐</span><span><strong>Neutral</strong><small>Experience was average.</small></span></label>
+                  <label class="rating-option smiley-option"><input type="radio" name="airOverallRating" value="NOT_SATISFIED" /><span class="smiley-face sad" aria-hidden="true">☹</span><span><strong>Not satisfied</strong><small>Experience needs improvement.</small></span></label>
+                </div>
+              </fieldset>
+
+              <fieldset class="survey-card">
+                <legend>Would you recommend this outlet for free air service?</legend>
+                <div class="recommend-grid">
+                  <label class="rating-option"><input type="radio" name="recommendRating" value="YES" /><span><strong>Yes</strong><small>I would recommend it.</small></span></label>
+                  <label class="rating-option"><input type="radio" name="recommendRating" value="MAYBE" /><span><strong>Maybe</strong><small>I might recommend it.</small></span></label>
+                  <label class="rating-option"><input type="radio" name="recommendRating" value="NO" /><span><strong>No</strong><small>I would not recommend it.</small></span></label>
+                </div>
+              </fieldset>
+            </div>
+
+            <label>
+              Comment (optional)
+              <textarea id="comment" name="comment" rows="4" placeholder="Tell us what happened, especially if the free air service was not working properly..."></textarea>
+            </label>
+
+            <label>
+              Upload photo (optional)
+              <input id="photoFile" name="photoFile" type="file" accept="image/*" capture="environment" />
+            </label>
+            <div class="helper-text" id="photoHelp">
+              You can take a photo with camera or choose from gallery (max 5 MB).
+            </div>
+
+            <input id="gpsLat" name="gpsLat" type="hidden" />
+            <input id="gpsLng" name="gpsLng" type="hidden" />
+
+            <button class="primary" type="submit">Submit feedback</button>
+          </form>
+        </article>
+      </section>
+
+      <section class="toast" id="toast" aria-live="polite"></section>
+    </main>
+
+    <script src="./config.js"></script>
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>

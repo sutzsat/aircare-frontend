@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AirCare Employee Dashboard</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="dashboard-shell">
+      <section class="login-panel" id="loginPanel">
+        <div class="brand-block">
+          <p class="eyebrow">AirCare employee console</p>
+          <h1>Track air-service performance across Odisha.</h1>
+          <p class="lead">
+            State Head sees the full campaign. Each Divisional Office sees only its own outlets, rankings, and feedback.
+          </p>
+        </div>
+
+        <form id="loginForm" class="auth-card">
+          <div>
+            <p class="card-label">Secure login</p>
+            <h2>Dashboard access</h2>
+          </div>
+
+          <label>
+            Phone number
+            <input id="phone" name="phone" type="tel" inputmode="numeric" placeholder="9000000001" />
+          </label>
+
+          <label>
+            Password
+            <input id="password" name="password" type="password" placeholder="Enter your password" />
+          </label>
+
+          <button class="primary-button" type="submit">Sign in</button>
+          <p class="hint">Use the seeded demo accounts for local validation.</p>
+        </form>
+      </section>
+
+      <section class="app-shell hidden" id="appShell">
+        <header class="hero-banner">
+          <div>
+            <p class="eyebrow">Employee dashboard</p>
+            <h1 id="scopeTitle">Loading dashboard...</h1>
+            <p class="lead" id="scopeSubtitle">Fetching campaign insight.</p>
+          </div>
+          <div class="hero-actions">
+            <div class="scope-chip" id="roleChip">Role</div>
+            <button class="ghost-button" id="managePasswordButton" type="button">Change Password</button>
+            <button class="ghost-button hidden" id="manageUsersButton" type="button">Manage Users</button>
+            <button class="ghost-button" id="logoutButton" type="button">Logout</button>
+          </div>
+        </header>
+
+        <section class="control-bar">
+          <label>
+            Score date
+            <input id="scoreDate" type="date" />
+          </label>
+          <label>
+            Trend start
+            <input id="trendStart" type="date" />
+          </label>
+          <label>
+            Trend end
+            <input id="trendEnd" type="date" />
+          </label>
+          <button class="primary-button" id="refreshButton" type="button">Refresh</button>
+        </section>
+
+        <section class="metric-grid" id="metricGrid"></section>
+
+        <section class="insight-grid">
+          <article class="panel panel-wide">
+            <div class="panel-head">
+              <div>
+                <p class="card-label">Campaign trend</p>
+                <h2>Happy Points over time</h2>
+              </div>
+            </div>
+            <div id="trendChart" class="chart-card"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-head">
+              <div>
+                <p class="card-label">Voice of customer</p>
+                <h2>Recommendation split</h2>
+              </div>
+            </div>
+            <div id="recommendationChart" class="stack-chart"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-head">
+              <div>
+                <p class="card-label">Service hotspots</p>
+                <h2>Negative issue areas</h2>
+              </div>
+            </div>
+            <div id="issueChart" class="bar-list"></div>
+          </article>
+        </section>
+
+        <section class="insight-grid lower-grid">
+          <article class="panel panel-wide">
+            <div class="panel-head">
+              <div>
+                <p class="card-label">Leaderboard</p>
+                <h2>Top outlets</h2>
+              </div>
+            </div>
+            <div id="leaderboardTable" class="table-shell"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-head">
+              <div>
+                <p class="card-label">Rollups</p>
+                <h2>Divisional summary</h2>
+              </div>
+            </div>
+            <div id="rollupList" class="rollup-list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-head">
+              <div>
+                <p class="card-label">Latest responses</p>
+                <h2>Recent feedback</h2>
+              </div>
+            </div>
+            <div id="recentFeedback" class="feedback-list"></div>
+          </article>
+        </section>
+      </section>
+
+      <section class="modal-overlay hidden" id="passwordModalOverlay">
+        <form id="passwordForm" class="modal-card">
+          <h2>Change Password</h2>
+          <label>
+            Current password
+            <input id="currentPassword" type="password" required />
+          </label>
+          <label>
+            New password (min 8 characters)
+            <input id="newPassword" type="password" required minlength="8" />
+          </label>
+          <div class="modal-actions">
+            <button type="button" class="ghost-button" id="closePasswordModal">Cancel</button>
+            <button type="submit" class="primary-button">Update Password</button>
+          </div>
+        </form>
+      </section>
+
+      <section class="modal-overlay hidden" id="userModalOverlay">
+        <div class="modal-card">
+          <h2 id="userModalTitle">Manage Users</h2>
+
+          <form id="createUserForm">
+            <label>
+              Full name
+              <input id="newUserName" type="text" required />
+            </label>
+            <label>
+              Phone number
+              <input id="newUserPhone" type="tel" inputmode="numeric" required />
+            </label>
+            <label>
+              Default password (they can change it after logging in)
+              <input id="newUserPassword" type="text" required minlength="8" />
+            </label>
+            <label id="scopeIdField">
+              Outlet
+              <select id="newUserScopeId"></select>
+            </label>
+            <div class="modal-actions">
+              <button type="button" class="ghost-button" id="closeUserModal">Cancel</button>
+              <button type="submit" class="primary-button">Create Account</button>
+            </div>
+          </form>
+
+          <div id="existingUsersList" class="user-list"></div>
+        </div>
+      </section>
+
+      <section class="toast" id="toast" aria-live="polite"></section>
+    </main>
+
+    <script src="./config.js"></script>
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>
