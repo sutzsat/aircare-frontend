@@ -37,9 +37,6 @@ const acknowledgementMessage = document.getElementById('acknowledgementMessage')
 const acknowledgementOutlet = document.getElementById('acknowledgementOutlet');
 const acknowledgementFeedbackId = document.getElementById('acknowledgementFeedbackId');
 const submitAnotherButton = document.getElementById('submitAnotherButton');
-const stepMobile = document.getElementById('stepMobile');
-const stepSurvey = document.getElementById('stepSurvey');
-const stepDone = document.getElementById('stepDone');
 
 const mobileForm = document.getElementById('mobileForm');
 const feedbackForm = document.getElementById('feedbackForm');
@@ -49,19 +46,12 @@ const photoFileInput = document.getElementById('photoFile');
 const photoHelp = document.getElementById('photoHelp');
 const gpsLatInput = document.getElementById('gpsLat');
 const gpsLngInput = document.getElementById('gpsLng');
+const mobileSubmitButton = mobileForm.querySelector('button[type="submit"]');
 
 let currentMobile = '';
 
 function setStep(activeStep) {
-  const mapping = {
-    mobile: stepMobile,
-    survey: stepSurvey,
-    done: stepDone,
-  };
-
-  Object.entries(mapping).forEach(([stepName, element]) => {
-    element.classList.toggle('active', stepName === activeStep);
-  });
+  void activeStep;
 }
 
 function showMobileStep() {
@@ -80,7 +70,7 @@ function showSurveyStep() {
   surveyPanel.classList.remove('hidden');
   unlockStep(feedbackForm);
   sessionStatus.textContent = 'Ready to submit';
-  outletSubtitle.textContent = 'Step 2 of 3: rate the service and submit your feedback.';
+  outletSubtitle.textContent = 'Rate the service and submit your feedback.';
   setStep('survey');
 }
 
@@ -244,6 +234,17 @@ async function loadOutlet() {
   }
 }
 
+async function checkMobileEligibility(mobileNumber) {
+  const params = new URLSearchParams({
+    ro_code: roCode,
+    mobile_number: mobileNumber,
+  });
+
+  return apiFetch(`/api/v1/feedback/eligibility?${params.toString()}`, {
+    method: 'GET',
+  });
+}
+
 mobileForm.addEventListener('submit', async (event) => {
   event.preventDefault();
   const mobileNumber = mobileNumberInput.value.trim();
@@ -252,10 +253,21 @@ mobileForm.addEventListener('submit', async (event) => {
     return;
   }
 
-  currentMobile = mobileNumber;
-  showSurveyStep();
-  captureGpsInBackground();
-  showToast('Great. Please complete the feedback form.');
+  mobileSubmitButton.disabled = true;
+  mobileSubmitButton.textContent = 'Checking...';
+
+  try {
+    await checkMobileEligibility(mobileNumber);
+    currentMobile = mobileNumber;
+    showSurveyStep();
+    captureGpsInBackground();
+    showToast('Great. Please complete the feedback form.');
+  } catch (error) {
+    showToast(error.message, 'error');
+  } finally {
+    mobileSubmitButton.disabled = false;
+    mobileSubmitButton.textContent = 'Continue';
+  }
 });
 
 feedbackForm.addEventListener('submit', async (event) => {
