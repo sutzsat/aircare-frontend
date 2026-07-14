@@ -31,6 +31,10 @@ const closeUserModal = document.getElementById('closeUserModal');
 const newUserScopeId = document.getElementById('newUserScopeId');
 const scopeIdField = document.getElementById('scopeIdField');
 const existingUsersList = document.getElementById('existingUsersList');
+const feedbackDetailOverlay = document.getElementById('feedbackDetailOverlay');
+const feedbackDetailTitle = document.getElementById('feedbackDetailTitle');
+const feedbackDetailBody = document.getElementById('feedbackDetailBody');
+const closeFeedbackDetail = document.getElementById('closeFeedbackDetail');
 
 let currentUserContext = null; // set after login -- { role, scope_type, scope_id }
 
@@ -95,6 +99,20 @@ function setAuthenticated(isAuthenticated) {
 
 function formatNumber(value) {
   return new Intl.NumberFormat('en-IN').format(value || 0);
+}
+
+function formatDateTime(value) {
+  if (!value) return 'Not available';
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+
+  return new Intl.DateTimeFormat('en-IN', {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  }).format(date);
 }
 
 /**
@@ -249,22 +267,87 @@ function renderRollups(stateRollup, divisionalOffices) {
 
 function renderRecentFeedback(items) {
   if (!items.length) {
-    recentFeedback.innerHTML = '<div class="muted">No recent feedback in this scope.</div>';
+    recentFeedback.innerHTML = '<div class="muted">No individual feedback found for the selected date and scope.</div>';
     return;
   }
 
   recentFeedback.innerHTML = items.map((item) => {
     const statusClass = `status-${item.status.toLowerCase()}`;
+    const commentPreview = item.comment ? escapeHtml(item.comment) : 'No comment provided.';
     return `
       <article class="feedback-item">
-        <div><strong>${escapeHtml(item.ro_name)}</strong></div>
-        <div class="muted">${escapeHtml(item.district)} • ${escapeHtml(item.divisional_office)}</div>
-        <div><span class="status-badge ${statusClass}">${escapeHtml(item.status)}</span></div>
-        <div class="muted">Overall: ${escapeHtml(item.overall_rating)} • Recommend: ${escapeHtml(item.recommend_rating)}</div>
-        <div>${escapeHtml(item.comment) || 'No comment provided.'}</div>
+        <div class="feedback-topline">
+          <div>
+            <strong>${escapeHtml(item.ro_name)}</strong>
+            <div class="muted">${escapeHtml(item.district)} • ${escapeHtml(item.divisional_office)}</div>
+          </div>
+          <button class="ghost-button inline-action" type="button" data-feedback-id="${item.feedback_id}">View details</button>
+        </div>
+        <div class="feedback-meta-row">
+          <span class="status-badge ${statusClass}">${escapeHtml(item.status)}</span>
+          <span class="muted">${formatDateTime(item.submitted_at)}</span>
+        </div>
+        <div class="muted">Mobile: ${escapeHtml(item.mobile_number)} • Overall: ${escapeHtml(item.overall_rating)} • Recommend: ${escapeHtml(item.recommend_rating)}${item.has_photo ? ' • Photo attached' : ''}</div>
+        <div>${commentPreview}</div>
       </article>
     `;
   }).join('');
+}
+
+function buildPhotoUrl(photoUrl) {
+  if (!photoUrl) return '';
+  if (photoUrl.startsWith('http://') || photoUrl.startsWith('https://')) {
+    return photoUrl;
+  }
+  return `${apiBase}${photoUrl}`;
+}
+
+function renderFeedbackDetail(item) {
+  const detailRows = [
+    ['Outlet', item.ro_name],
+    ['District', item.district],
+    ['Divisional office', item.divisional_office],
+    ['Mobile number', item.mobile_number],
+    ['Submitted at', formatDateTime(item.submitted_at)],
+    ['Status', item.status],
+    ['Flag reason', item.flag_reason || 'None'],
+    ['Overall', item.overall_rating],
+    ['Availability', item.availability_rating],
+    ['Equipment', item.equipment_rating],
+    ['Promptness', item.promptness_rating],
+    ['Attendant behaviour', item.attendant_rating],
+    ['Recommend', item.recommend_rating],
+    ['GPS', item.gps_lat !== null && item.gps_lng !== null ? `${item.gps_lat}, ${item.gps_lng}` : 'Not captured'],
+  ];
+
+  const photoUrl = buildPhotoUrl(item.photo_url);
+  feedbackDetailTitle.textContent = item.ro_name;
+  feedbackDetailBody.innerHTML = `
+    <div class="feedback-detail-grid">
+      ${detailRows.map(([label, value]) => `
+        <div class="detail-card">
+          <span class="detail-label">${escapeHtml(label)}</span>
+          <strong>${escapeHtml(value ?? 'Not available')}</strong>
+        </div>
+      `).join('')}
+    </div>
+    <div class="feedback-detail-section">
+      <span class="detail-label">Comment</span>
+      <p>${escapeHtml(item.comment) || 'No comment provided.'}</p>
+    </div>
+    ${photoUrl ? `
+      <div class="feedback-detail-section">
+        <span class="detail-label">Photo evidence</span>
+        <a class="ghost-button inline-action" href="${escapeHtml(photoUrl)}" target="_blank" rel="noreferrer">Open photo</a>
+      </div>
+    ` : ''}
+  `;
+  feedbackDetailOverlay.classList.remove('hidden');
+}
+
+async function openFeedbackDetail(feedbackId) {
+  const response = await apiFetch(`/api/v1/dashboard/feedback/${encodeURIComponent(feedbackId)}`);
+  renderFeedbackDetail(response.data);
 }
 
 async function loadDashboard() {
@@ -278,7 +361,7 @@ async function loadDashboard() {
     apiFetch(`/api/v1/dashboard/leaderboard?score_date=${encodeURIComponent(scoreDate)}&limit=10`),
     apiFetch(`/api/v1/dashboard/trend?start_date=${encodeURIComponent(trendStart)}&end_date=${encodeURIComponent(trendEnd)}`),
     apiFetch(`/api/v1/dashboard/rollups?score_date=${encodeURIComponent(scoreDate)}`),
-    apiFetch('/api/v1/dashboard/recent-feedback?limit=8'),
+    apiFetch(`/api/v1/dashboard/recent-feedback?score_date=${encodeURIComponent(scoreDate)}&limit=12`),
   ]);
 
   scopeTitle.textContent = me.data.scope_label;
@@ -437,6 +520,29 @@ manageUsersButton.addEventListener('click', async () => {
 
 closeUserModal.addEventListener('click', () => {
   userModalOverlay.classList.add('hidden');
+});
+
+closeFeedbackDetail.addEventListener('click', () => {
+  feedbackDetailOverlay.classList.add('hidden');
+});
+
+feedbackDetailOverlay.addEventListener('click', (event) => {
+  if (event.target === feedbackDetailOverlay) {
+    feedbackDetailOverlay.classList.add('hidden');
+  }
+});
+
+recentFeedback.addEventListener('click', async (event) => {
+  const trigger = event.target.closest('[data-feedback-id]');
+  if (!trigger) {
+    return;
+  }
+
+  try {
+    await openFeedbackDetail(trigger.dataset.feedbackId);
+  } catch (error) {
+    showToast(error.message, 'error');
+  }
 });
 
 createUserForm.addEventListener('submit', async (event) => {

@@ -131,7 +131,7 @@
             <div class="panel-head">
               <div>
                 <p class="card-label">Latest responses</p>
-                <h2>Recent feedback</h2>
+                <h2>Individual feedback</h2>
               </div>
             </div>
             <div id="recentFeedback" class="feedback-list"></div>
@@ -185,6 +185,19 @@
           </form>
 
           <div id="existingUsersList" class="user-list"></div>
+        </div>
+      </section>
+
+      <section class="modal-overlay hidden" id="feedbackDetailOverlay">
+        <div class="modal-card feedback-detail-modal">
+          <div class="feedback-detail-header">
+            <div>
+              <p class="card-label">Feedback record</p>
+              <h2 id="feedbackDetailTitle">Feedback details</h2>
+            </div>
+            <button type="button" class="ghost-button" id="closeFeedbackDetail">Close</button>
+          </div>
+          <div id="feedbackDetailBody" class="feedback-detail-body"></div>
         </div>
       </section>
 
