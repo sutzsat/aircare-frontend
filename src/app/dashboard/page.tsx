@@ -206,10 +206,11 @@ function AdminView({ data }: { data: AdminOverviewData["data"] }) {
     { icon: MapPin, label: "Districts", value: data.by_district.length },
     { icon: AlertTriangle, label: "Open Tickets", value: data.open_tickets_count },
   ];
+  const title = data.scope_type === "DO" ? "Divisional Office Overview" : "State Overview — Odisha";
   return (
     <>
       <h1 className="font-[var(--font-display)] text-lg font-bold mb-4" style={{ color: "var(--color-navy)" }}>
-        State Overview — Odisha
+        {title}
       </h1>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
         {kpis.map((k, i) => (

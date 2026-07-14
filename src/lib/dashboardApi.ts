@@ -117,6 +117,7 @@ export function getDistrictDashboard(districtId: number) {
 
 export interface AdminOverviewData {
   data: {
+    scope_type: string;
     score_date: string;
     total_feedback: number;
     ro_reporting_count: number;

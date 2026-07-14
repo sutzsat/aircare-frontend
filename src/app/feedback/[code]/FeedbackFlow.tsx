@@ -2,10 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { Wind, Check, Camera, X } from "lucide-react";
-import { AirGauge } from "@/components/AirGauge";
+import { SmileyRating, RatingValue } from "@/components/SmileyRating";
 import {
   ApiError,
-  Rating,
   getBrowserLocation,
   getPublicConfig,
   registerMobile,
@@ -24,11 +23,7 @@ const ALLOWED_PHOTO_TYPES = ["image/jpeg", "image/png"];
 
 type Step = "loading" | "invalid" | "mobile" | "selfcheck" | "escalation" | "gps_escalation" | "rating" | "submitting" | "done" | "error";
 
-const RATING_OPTIONS: { value: Rating; label: string; gauge: number }[] = [
-  { value: "NOT_SATISFIED", label: "Not Satisfied", gauge: 15 },
-  { value: "NEUTRAL", label: "Neutral", gauge: 50 },
-  { value: "SATISFIED", label: "Satisfied", gauge: 85 },
-];
+type NpsValue = "YES" | "MAYBE" | "NO";
 
 export function FeedbackFlow({ roCode }: { roCode: string }) {
   const [step, setStep] = useState<Step>("loading");
@@ -39,14 +34,25 @@ export function FeedbackFlow({ roCode }: { roCode: string }) {
   const [honeypot, setHoneypot] = useState(""); // must stay empty -- a human never fills this
   const [escalationOtp, setEscalationOtp] = useState("");
   const [sessionToken, setSessionToken] = useState("");
-  const [rating, setRating] = useState<Rating | null>(null);
+
+  // The 4 dimensions required by the AirCare Challenge doc, each a
+  // separate smiley-face question -- not one overall rating.
+  const [availabilityRating, setAvailabilityRating] = useState<RatingValue | null>(null);
+  const [functionalityRating, setFunctionalityRating] = useState<RatingValue | null>(null);
+  const [promptnessRating, setPromptnessRating] = useState<RatingValue | null>(null);
+  const [attendantBehaviourRating, setAttendantBehaviourRating] = useState<RatingValue | null>(null);
+  const [overallExperienceRating, setOverallExperienceRating] = useState<RatingValue | null>(null);
+  const [npsResponse, setNpsResponse] = useState<NpsValue | null>(null);
+
   const [comment, setComment] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
-  const [submittedRatingGauge, setSubmittedRatingGauge] = useState(50);
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreviewUrl, setPhotoPreviewUrl] = useState<string | null>(null);
   const [photoError, setPhotoError] = useState("");
   const [selfCheckEnabled, setSelfCheckEnabled] = useState<boolean | null>(null);
+
+  const allDimensionsAnswered =
+    availabilityRating && functionalityRating && promptnessRating && attendantBehaviourRating && overallExperienceRating;
 
   useEffect(() => {
     Promise.all([validateRo(roCode), getPublicConfig().catch(() => null)])
@@ -82,9 +88,6 @@ export function FeedbackFlow({ roCode }: { roCode: string }) {
     setErrorMessage("");
 
     if (!selfCheckEnabled) {
-      // Self-check disabled (current default) -- register the number
-      // directly and go straight to rating. The duplicate-submission rule
-      // still applies unchanged at actual submission time.
       try {
         const res = await registerMobile(mobile, roCode);
         setSessionToken(res.data.feedback_session_token);
@@ -108,8 +111,6 @@ export function FeedbackFlow({ roCode }: { roCode: string }) {
     try {
       const res = await verifySelfCheck(challengeId, confirmed, honeypot, mobile, roCode);
       if (res.data.requires_escalation) {
-        // A false positive here costs the customer one extra WhatsApp step,
-        // never a rejected submission -- see self_check_service.py.
         setStep("escalation");
         await requestEscalationOtp(mobile);
       } else if (res.data.feedback_session_token) {
@@ -174,7 +175,12 @@ export function FeedbackFlow({ roCode }: { roCode: string }) {
     await submitFeedback(
       {
         ro_code: roCode,
-        rating: rating as Rating,
+        availability_rating: availabilityRating as RatingValue,
+        functionality_rating: functionalityRating as RatingValue,
+        promptness_rating: promptnessRating as RatingValue,
+        attendant_behaviour_rating: attendantBehaviourRating as RatingValue,
+        overall_experience_rating: overallExperienceRating as RatingValue,
+        nps_response: npsResponse ?? undefined,
         comment: comment.trim() || undefined,
         photo_url: photoUrl,
         gps_lat: location?.lat,
@@ -185,19 +191,14 @@ export function FeedbackFlow({ roCode }: { roCode: string }) {
   }
 
   async function handleSubmit() {
-    if (!rating) return;
+    if (!allDimensionsAnswered) return;
     setStep("submitting");
     setErrorMessage("");
     try {
       await doSubmit(sessionToken);
-      const opt = RATING_OPTIONS.find((r) => r.value === rating)!;
-      setSubmittedRatingGauge(opt.gauge);
       setStep("done");
     } catch (e) {
       if (e instanceof ApiError && e.code === "GPS_VERIFICATION_REQUIRED") {
-        // Rating/comment/photo are kept in state (never cleared) -- the
-        // customer's input isn't lost, they just verify their number via
-        // WhatsApp and the same submission is retried automatically.
         setStep("gps_escalation");
         try {
           await requestEscalationOtp(mobile);
@@ -217,8 +218,6 @@ export function FeedbackFlow({ roCode }: { roCode: string }) {
     try {
       const res = await verifyEscalationOtp(mobile, escalationOtp, roCode);
       await doSubmit(res.data.feedback_session_token);
-      const opt = RATING_OPTIONS.find((r) => r.value === rating)!;
-      setSubmittedRatingGauge(opt.gauge);
       setStep("done");
     } catch (e) {
       setErrorMessage(e instanceof ApiError ? e.message : "Verification failed. Try again.");
@@ -291,9 +290,6 @@ export function FeedbackFlow({ roCode }: { roCode: string }) {
 
         {step === "selfcheck" && (
           <Card>
-            {/* Honeypot: invisible to sighted humans and screen readers, but
-                many naive bots fill every field they find. Never
-                display:none, which some bots specifically skip. */}
             <div
               style={{ position: "absolute", left: "-9999px", opacity: 0 }}
               aria-hidden="true"
@@ -377,21 +373,52 @@ export function FeedbackFlow({ roCode }: { roCode: string }) {
 
         {(step === "rating" || step === "submitting") && (
           <>
+            <Card className="mb-4 space-y-5">
+              <SmileyRating
+                question="Availability of the Air Facility"
+                value={availabilityRating}
+                onChange={setAvailabilityRating}
+              />
+              <SmileyRating
+                question="Functionality of Air Gauge & Equipment"
+                value={functionalityRating}
+                onChange={setFunctionalityRating}
+              />
+              <SmileyRating
+                question="Promptness of Service"
+                value={promptnessRating}
+                onChange={setPromptnessRating}
+              />
+              <SmileyRating
+                question="Attendant's Behaviour & Support"
+                value={attendantBehaviourRating}
+                onChange={setAttendantBehaviourRating}
+              />
+              <SmileyRating
+                question="Overall Service Experience"
+                value={overallExperienceRating}
+                onChange={setOverallExperienceRating}
+              />
+            </Card>
+
             <Card className="mb-4">
-              <div className="text-sm font-semibold mb-3">Rate your experience</div>
+              <div className="text-sm font-medium mb-2" style={{ color: "var(--color-navy)" }}>
+                Would you recommend this Retail Outlet for Free Air Service to others?
+              </div>
               <div className="flex gap-2">
-                {RATING_OPTIONS.map((opt) => (
+                {(["YES", "MAYBE", "NO"] as NpsValue[]).map((opt) => (
                   <button
-                    key={opt.value}
-                    onClick={() => setRating(opt.value)}
-                    className="flex-1 rounded-xl p-3 flex flex-col items-center border-2 transition"
+                    key={opt}
+                    type="button"
+                    onClick={() => setNpsResponse(opt)}
+                    className="flex-1 rounded-lg py-2 text-xs font-semibold border transition"
                     style={{
-                      borderColor: rating === opt.value ? "var(--color-orange)" : "var(--color-border)",
-                      backgroundColor: rating === opt.value ? "var(--color-orange-soft)" : "transparent",
+                      borderColor: npsResponse === opt ? "var(--color-orange)" : "var(--color-border)",
+                      backgroundColor: npsResponse === opt ? "var(--color-orange-soft)" : "transparent",
+                      color: npsResponse === opt ? "var(--color-orange)" : "var(--color-muted)",
                     }}
                   >
-                    <AirGauge value={opt.gauge} size={64} />
-                    <span className="text-xs font-medium mt-1">{opt.label}</span>
+                    {opt.charAt(0) + opt.slice(1).toLowerCase()}
                   </button>
                 ))}
               </div>
@@ -446,7 +473,7 @@ export function FeedbackFlow({ roCode }: { roCode: string }) {
             </Card>
 
             <button
-              disabled={!rating || step === "submitting"}
+              disabled={!allDimensionsAnswered || step === "submitting"}
               onClick={handleSubmit}
               className="w-full rounded-xl py-3 text-sm font-bold text-white disabled:opacity-40"
               style={{ backgroundColor: "var(--color-orange)" }}
@@ -465,9 +492,6 @@ export function FeedbackFlow({ roCode }: { roCode: string }) {
             <p className="text-sm mt-2 text-[var(--color-muted)]">
               Your feedback for {roName} has been recorded.
             </p>
-            <div className="flex justify-center mt-6">
-              <AirGauge value={submittedRatingGauge} size={120} />
-            </div>
           </div>
         )}
       </div>

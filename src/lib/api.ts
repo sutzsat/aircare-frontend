@@ -163,7 +163,12 @@ export async function uploadPhotoToS3(
 
 export interface FeedbackSubmitPayload {
   ro_code: string;
-  rating: Rating;
+  availability_rating: Rating;
+  functionality_rating: Rating;
+  promptness_rating: Rating;
+  attendant_behaviour_rating: Rating;
+  overall_experience_rating: Rating;
+  nps_response?: "YES" | "MAYBE" | "NO";
   comment?: string;
   photo_url?: string;
   gps_lat?: number;
