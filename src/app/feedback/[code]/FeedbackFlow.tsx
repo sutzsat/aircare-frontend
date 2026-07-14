@@ -35,8 +35,8 @@ export function FeedbackFlow({ roCode }: { roCode: string }) {
   const [escalationOtp, setEscalationOtp] = useState("");
   const [sessionToken, setSessionToken] = useState("");
 
-  // The 4 dimensions required by the AirCare Challenge doc, each a
-  // separate smiley-face question -- not one overall rating.
+  // The five feedback dimensions are captured as separate smiley-face
+  // questions, not a single overall rating.
   const [availabilityRating, setAvailabilityRating] = useState<RatingValue | null>(null);
   const [functionalityRating, setFunctionalityRating] = useState<RatingValue | null>(null);
   const [promptnessRating, setPromptnessRating] = useState<RatingValue | null>(null);
@@ -251,17 +251,30 @@ export function FeedbackFlow({ roCode }: { roCode: string }) {
   return (
     <Shell>
       <div className="max-w-md mx-auto px-4 py-6">
-        <div className="text-center mb-5">
-          <div className="text-xs uppercase tracking-wide font-semibold text-[var(--color-orange)]">
-            {roName || "IndianOil Retail Outlet"}
+        <Card className="mb-4 bg-[linear-gradient(180deg,rgba(255,255,255,0.94),rgba(253,244,237,0.96))] overflow-hidden">
+          <div className="text-center">
+            <div className="text-xs uppercase tracking-wide font-semibold text-[var(--color-orange)]">
+              {roName || "IndianOil Retail Outlet"}
+            </div>
+            <h1 className="font-[var(--font-display)] text-xl font-bold mt-1 text-[var(--color-navy)]">
+              How was the Free Air facility?
+            </h1>
+            <p className="text-sm mt-1 text-[var(--color-muted)]">
+              Answer the 5 smiley questions below and share anything else that stood out.
+            </p>
           </div>
-          <h1 className="font-[var(--font-display)] text-xl font-bold mt-1">
-            How was the Free Air facility?
-          </h1>
-          <p className="text-sm mt-1 text-[var(--color-muted)]">
-            Your feedback drives our excellence. Latest build.
-          </p>
-        </div>
+
+          <div className="mt-4 flex flex-wrap gap-2 justify-center">
+            {['1. Mobile', '2. OTP', '3. Smiley survey'].map((stepLabel, index) => (
+              <span
+                key={stepLabel}
+                className={`px-3 py-2 rounded-full text-xs font-semibold border ${index === 2 ? 'bg-[var(--color-orange-soft)] text-[var(--color-orange)] border-[var(--color-orange-soft)]' : 'bg-white text-[var(--color-muted)] border-[var(--color-border)]'}`}
+              >
+                {stepLabel}
+              </span>
+            ))}
+          </div>
+        </Card>
 
         {errorMessage && (
           <div className="mb-4 rounded-lg bg-[var(--color-danger-soft)] text-[var(--color-danger)] text-sm px-3 py-2">

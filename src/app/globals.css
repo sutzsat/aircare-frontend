@@ -22,9 +22,17 @@
 }
 
 body {
-  background: var(--color-bg);
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at top left, rgba(242, 107, 33, 0.12), transparent 26%),
+    radial-gradient(circle at top right, rgba(21, 128, 61, 0.1), transparent 24%),
+    linear-gradient(180deg, #f8fafc 0%, #f3f5f8 100%);
   color: var(--color-navy);
   font-family: var(--font-body);
+}
+
+main {
+  min-height: 100vh;
 }
 
 /* Visible keyboard focus everywhere -- accessibility floor per design skill */

@@ -31,10 +31,10 @@ function SmileyIcon({ type, active }: { type: RatingValue; active: boolean }) {
   );
 }
 
-const OPTIONS: { value: RatingValue; label: string }[] = [
-  { value: "NOT_SATISFIED", label: "Not Satisfied" },
-  { value: "NEUTRAL", label: "Neutral" },
-  { value: "SATISFIED", label: "Satisfied" },
+const OPTIONS: { value: RatingValue; label: string; hint: string }[] = [
+  { value: "NOT_SATISFIED", label: "Not satisfied", hint: "Needs attention" },
+  { value: "NEUTRAL", label: "Neutral", hint: "Could be better" },
+  { value: "SATISFIED", label: "Satisfied", hint: "Looks good" },
 ];
 
 export function SmileyRating({
@@ -48,25 +48,33 @@ export function SmileyRating({
 }) {
   return (
     <div>
-      <div className="text-sm font-medium mb-2" style={{ color: "var(--color-navy)" }}>
+      <div className="text-sm font-medium mb-3" style={{ color: "var(--color-navy)" }}>
         {question}
       </div>
-      <div className="flex gap-3 justify-center">
+      <div className="grid grid-cols-3 gap-3">
         {OPTIONS.map((opt) => (
           <button
             key={opt.value}
             type="button"
             onClick={() => onChange(opt.value)}
-            className="flex flex-col items-center gap-1 rounded-lg px-2 py-1.5 transition"
+            className="flex min-h-28 flex-col items-center gap-2 rounded-2xl border px-3 py-3 text-center transition"
             style={{
-              backgroundColor: value === opt.value ? "var(--color-orange-soft)" : "transparent",
+              backgroundColor: value === opt.value ? "var(--color-orange-soft)" : "rgba(255,255,255,0.75)",
+              borderColor: value === opt.value ? "var(--color-orange)" : "var(--color-border)",
+              boxShadow: value === opt.value ? "0 12px 28px rgba(242, 107, 33, 0.12)" : "none",
             }}
             aria-pressed={value === opt.value}
+            aria-label={`${question}: ${opt.label}`}
           >
             <SmileyIcon type={opt.value} active={value === opt.value} />
-            <span className="text-[10px]" style={{ color: "var(--color-muted)" }}>
-              {opt.label}
-            </span>
+            <div>
+              <div className="text-xs font-semibold" style={{ color: "var(--color-navy)" }}>
+                {opt.label}
+              </div>
+              <div className="text-[10px] leading-tight mt-1" style={{ color: "var(--color-muted)" }}>
+                {opt.hint}
+              </div>
+            </div>
           </button>
         ))}
       </div>
