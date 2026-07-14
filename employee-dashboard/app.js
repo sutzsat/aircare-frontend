@@ -281,6 +281,10 @@ function renderRollups(stateRollup, divisionalOffices) {
 }
 
 function renderRecentFeedback(items) {
+  if (!recentFeedback) {
+    return;
+  }
+
   if (!items.length) {
     recentFeedback.innerHTML = '<div class="muted">No latest feedback found for the selected score date.</div>';
     return;
@@ -635,18 +639,20 @@ feedbackDetailOverlay.addEventListener('click', (event) => {
   }
 });
 
-recentFeedback.addEventListener('click', async (event) => {
-  const trigger = event.target.closest('[data-feedback-id]');
-  if (!trigger) {
-    return;
-  }
+if (recentFeedback) {
+  recentFeedback.addEventListener('click', async (event) => {
+    const trigger = event.target.closest('[data-feedback-id]');
+    if (!trigger) {
+      return;
+    }
 
-  try {
-    await openFeedbackDetail(trigger.dataset.feedbackId);
-  } catch (error) {
-    showToast(error.message, 'error');
-  }
-});
+    try {
+      await openFeedbackDetail(trigger.dataset.feedbackId);
+    } catch (error) {
+      showToast(error.message, 'error');
+    }
+  });
+}
 
 feedbackTable.addEventListener('click', async (event) => {
   const trigger = event.target.closest('[data-feedback-id]');
