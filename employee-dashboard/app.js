@@ -18,6 +18,16 @@ const issueChart = document.getElementById('issueChart');
 const leaderboardTable = document.getElementById('leaderboardTable');
 const rollupList = document.getElementById('rollupList');
 const recentFeedback = document.getElementById('recentFeedback');
+const feedbackTable = document.getElementById('feedbackTable');
+const feedbackStartDateInput = document.getElementById('feedbackStartDate');
+const feedbackEndDateInput = document.getElementById('feedbackEndDate');
+const feedbackStatusFilter = document.getElementById('feedbackStatusFilter');
+const feedbackOutletFilter = document.getElementById('feedbackOutletFilter');
+const applyFeedbackFiltersButton = document.getElementById('applyFeedbackFilters');
+const resetFeedbackFiltersButton = document.getElementById('resetFeedbackFilters');
+const feedbackPrevPageButton = document.getElementById('feedbackPrevPage');
+const feedbackNextPageButton = document.getElementById('feedbackNextPage');
+const feedbackPaginationSummary = document.getElementById('feedbackPaginationSummary');
 const toast = document.getElementById('toast');
 const managePasswordButton = document.getElementById('managePasswordButton');
 const manageUsersButton = document.getElementById('manageUsersButton');
@@ -37,11 +47,16 @@ const feedbackDetailBody = document.getElementById('feedbackDetailBody');
 const closeFeedbackDetail = document.getElementById('closeFeedbackDetail');
 
 let currentUserContext = null; // set after login -- { role, scope_type, scope_id }
+let feedbackPage = 1;
+let feedbackTotalPages = 0;
+let feedbackPageSize = 10;
 
 const today = new Date().toISOString().slice(0, 10);
 scoreDateInput.value = today;
 trendEndInput.value = today;
 trendStartInput.value = new Date(Date.now() - 6 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+feedbackStartDateInput.value = today;
+feedbackEndDateInput.value = today;
 
 function showToast(message, type = 'success') {
   toast.textContent = message;
@@ -267,7 +282,7 @@ function renderRollups(stateRollup, divisionalOffices) {
 
 function renderRecentFeedback(items) {
   if (!items.length) {
-    recentFeedback.innerHTML = '<div class="muted">No individual feedback found for the selected date and scope.</div>';
+    recentFeedback.innerHTML = '<div class="muted">No latest feedback found for the selected score date.</div>';
     return;
   }
 
@@ -292,6 +307,73 @@ function renderRecentFeedback(items) {
       </article>
     `;
   }).join('');
+}
+
+function populateFeedbackOutletFilter(outlets) {
+  feedbackOutletFilter.innerHTML = `
+    <option value="">All outlets</option>
+    ${outlets.map((outlet) => `<option value="${outlet.ro_id}">${escapeHtml(outlet.ro_name)}</option>`).join('')}
+  `;
+}
+
+function getFeedbackFilters() {
+  return {
+    startDate: feedbackStartDateInput.value || '',
+    endDate: feedbackEndDateInput.value || '',
+    status: feedbackStatusFilter.value || '',
+    roId: feedbackOutletFilter.value || '',
+  };
+}
+
+function renderFeedbackTable(items, pagination) {
+  if (!items.length) {
+    feedbackTable.innerHTML = '<div class="muted">No feedback records match the selected filters.</div>';
+    feedbackPaginationSummary.textContent = '0 results';
+    feedbackPrevPageButton.disabled = true;
+    feedbackNextPageButton.disabled = true;
+    return;
+  }
+
+  feedbackTable.innerHTML = `
+    <table>
+      <thead>
+        <tr>
+          <th>Submitted</th>
+          <th>Outlet</th>
+          <th>Status</th>
+          <th>Overall</th>
+          <th>Recommend</th>
+          <th>Mobile</th>
+          <th>Comment</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        ${items.map((item) => `
+          <tr>
+            <td>${escapeHtml(formatDateTime(item.submitted_at))}</td>
+            <td>
+              <strong>${escapeHtml(item.ro_name)}</strong>
+              <div class="muted table-secondary">${escapeHtml(item.district)}</div>
+            </td>
+            <td><span class="status-badge status-${item.status.toLowerCase()}">${escapeHtml(item.status)}</span></td>
+            <td>${escapeHtml(item.overall_rating)}</td>
+            <td>${escapeHtml(item.recommend_rating)}</td>
+            <td>${escapeHtml(item.mobile_number)}</td>
+            <td>${escapeHtml(item.comment || 'No comment provided.')}</td>
+            <td><button class="ghost-button inline-action" type="button" data-feedback-id="${item.feedback_id}">View details</button></td>
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>
+  `;
+
+  const total = pagination.total || 0;
+  const start = total ? (pagination.page - 1) * pagination.page_size + 1 : 0;
+  const end = total ? Math.min(pagination.page * pagination.page_size, total) : 0;
+  feedbackPaginationSummary.textContent = `Showing ${start}-${end} of ${formatNumber(total)} feedback records`;
+  feedbackPrevPageButton.disabled = pagination.page <= 1;
+  feedbackNextPageButton.disabled = pagination.total_pages === 0 || pagination.page >= pagination.total_pages;
 }
 
 function buildPhotoUrl(photoUrl) {
@@ -350,18 +432,37 @@ async function openFeedbackDetail(feedbackId) {
   renderFeedbackDetail(response.data);
 }
 
+async function loadFeedbackExplorer(page = 1) {
+  const filters = getFeedbackFilters();
+  const params = new URLSearchParams({
+    page: String(page),
+    page_size: String(feedbackPageSize),
+  });
+
+  if (filters.startDate) params.set('start_date', filters.startDate);
+  if (filters.endDate) params.set('end_date', filters.endDate);
+  if (filters.status) params.set('status', filters.status);
+  if (filters.roId) params.set('ro_id', filters.roId);
+
+  const response = await apiFetch(`/api/v1/dashboard/feedback?${params.toString()}`);
+  feedbackPage = response.pagination.page;
+  feedbackTotalPages = response.pagination.total_pages;
+  renderFeedbackTable(response.data.items, response.pagination);
+}
+
 async function loadDashboard() {
   const scoreDate = scoreDateInput.value;
   const trendStart = trendStartInput.value;
   const trendEnd = trendEndInput.value;
 
-  const [me, overview, leaderboard, trend, rollups, recentFeedbackResponse] = await Promise.all([
+  const [me, overview, leaderboard, trend, rollups, recentFeedbackResponse, feedbackOutletsResponse] = await Promise.all([
     apiFetch('/api/v1/dashboard/me'),
     apiFetch(`/api/v1/dashboard/overview?score_date=${encodeURIComponent(scoreDate)}`),
     apiFetch(`/api/v1/dashboard/leaderboard?score_date=${encodeURIComponent(scoreDate)}&limit=10`),
     apiFetch(`/api/v1/dashboard/trend?start_date=${encodeURIComponent(trendStart)}&end_date=${encodeURIComponent(trendEnd)}`),
     apiFetch(`/api/v1/dashboard/rollups?score_date=${encodeURIComponent(scoreDate)}`),
     apiFetch(`/api/v1/dashboard/recent-feedback?score_date=${encodeURIComponent(scoreDate)}&limit=12`),
+    apiFetch('/api/v1/dashboard/feedback-outlets'),
   ]);
 
   scopeTitle.textContent = me.data.scope_label;
@@ -382,6 +483,8 @@ async function loadDashboard() {
   renderLeaderboard(leaderboard.data.leaderboard);
   renderRollups(rollups.data.state, rollups.data.divisional_offices);
   renderRecentFeedback(recentFeedbackResponse.data.items);
+  populateFeedbackOutletFilter(feedbackOutletsResponse.data.outlets);
+  await loadFeedbackExplorer(1);
 }
 
 loginForm.addEventListener('submit', async (event) => {
@@ -540,6 +643,60 @@ recentFeedback.addEventListener('click', async (event) => {
 
   try {
     await openFeedbackDetail(trigger.dataset.feedbackId);
+  } catch (error) {
+    showToast(error.message, 'error');
+  }
+});
+
+feedbackTable.addEventListener('click', async (event) => {
+  const trigger = event.target.closest('[data-feedback-id]');
+  if (!trigger) {
+    return;
+  }
+
+  try {
+    await openFeedbackDetail(trigger.dataset.feedbackId);
+  } catch (error) {
+    showToast(error.message, 'error');
+  }
+});
+
+applyFeedbackFiltersButton.addEventListener('click', async () => {
+  try {
+    await loadFeedbackExplorer(1);
+    showToast('Feedback filters applied.');
+  } catch (error) {
+    showToast(error.message, 'error');
+  }
+});
+
+resetFeedbackFiltersButton.addEventListener('click', async () => {
+  feedbackStartDateInput.value = scoreDateInput.value;
+  feedbackEndDateInput.value = scoreDateInput.value;
+  feedbackStatusFilter.value = '';
+  feedbackOutletFilter.value = '';
+
+  try {
+    await loadFeedbackExplorer(1);
+    showToast('Feedback filters reset.');
+  } catch (error) {
+    showToast(error.message, 'error');
+  }
+});
+
+feedbackPrevPageButton.addEventListener('click', async () => {
+  if (feedbackPage <= 1) return;
+  try {
+    await loadFeedbackExplorer(feedbackPage - 1);
+  } catch (error) {
+    showToast(error.message, 'error');
+  }
+});
+
+feedbackNextPageButton.addEventListener('click', async () => {
+  if (feedbackPage >= feedbackTotalPages) return;
+  try {
+    await loadFeedbackExplorer(feedbackPage + 1);
   } catch (error) {
     showToast(error.message, 'error');
   }
