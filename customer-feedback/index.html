@@ -20,8 +20,9 @@
             Scan the QR, enter your mobile number, and submit your rating in under a minute.
           </p>
           <div class="stepper">
-            <span class="step active">1. Mobile</span>
-            <span class="step">2. Smiley survey</span>
+            <span class="step active" id="stepMobile">1. Mobile</span>
+            <span class="step" id="stepSurvey">2. Smiley survey</span>
+            <span class="step" id="stepDone">3. Acknowledgement</span>
           </div>
         </div>
         <div class="hero-badge">
@@ -30,8 +31,8 @@
         </div>
       </section>
 
-      <section class="content-grid">
-        <article class="panel">
+      <section class="content-grid" id="feedbackFlow">
+        <article class="panel" id="mobilePanel">
           <div class="panel-header">
             <div>
               <p class="panel-label">Step 1</p>
@@ -53,7 +54,7 @@
           </div>
         </article>
 
-        <article class="panel panel-wide">
+        <article class="panel panel-wide hidden" id="surveyPanel">
           <div class="panel-header">
             <div>
               <p class="panel-label">Step 2</p>
@@ -138,6 +139,19 @@
             <button class="primary" type="submit">Submit feedback</button>
           </form>
         </article>
+      </section>
+
+      <section class="panel acknowledgement hidden" id="acknowledgementPanel">
+        <p class="panel-label">Step 3</p>
+        <h2>Thank you for your feedback</h2>
+        <p class="subtitle" id="acknowledgementMessage">
+          Your response has been recorded successfully.
+        </p>
+        <div class="acknowledgement-card">
+          <strong id="acknowledgementOutlet">Outlet</strong>
+          <span id="acknowledgementFeedbackId">Feedback reference</span>
+        </div>
+        <button class="secondary" type="button" id="submitAnotherButton">Submit another feedback</button>
       </section>
 
       <section class="toast" id="toast" aria-live="polite"></section>

@@ -148,6 +148,10 @@ h1 {
   gap: 18px;
 }
 
+.hidden {
+  display: none !important;
+}
+
 .panel {
   border-radius: 24px;
   padding: 22px;
@@ -155,6 +159,38 @@ h1 {
 
 .panel-wide {
   grid-column: 1 / -1;
+}
+
+.acknowledgement {
+  display: grid;
+  gap: 18px;
+  margin-top: 18px;
+  text-align: center;
+  justify-items: center;
+}
+
+.acknowledgement .subtitle {
+  margin-bottom: 0;
+  max-width: 560px;
+}
+
+.acknowledgement-card {
+  display: grid;
+  gap: 8px;
+  width: min(520px, 100%);
+  padding: 20px;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(79, 209, 197, 0.2);
+}
+
+.acknowledgement-card strong {
+  font-size: 1.15rem;
+}
+
+.acknowledgement-card span {
+  color: var(--muted);
+  word-break: break-word;
 }
 
 .panel-header {

@@ -29,6 +29,17 @@ const outletSubtitle = document.getElementById('outletSubtitle');
 const availabilityPill = document.getElementById('availabilityPill');
 const sessionStatus = document.getElementById('sessionStatus');
 const toast = document.getElementById('toast');
+const feedbackFlow = document.getElementById('feedbackFlow');
+const mobilePanel = document.getElementById('mobilePanel');
+const surveyPanel = document.getElementById('surveyPanel');
+const acknowledgementPanel = document.getElementById('acknowledgementPanel');
+const acknowledgementMessage = document.getElementById('acknowledgementMessage');
+const acknowledgementOutlet = document.getElementById('acknowledgementOutlet');
+const acknowledgementFeedbackId = document.getElementById('acknowledgementFeedbackId');
+const submitAnotherButton = document.getElementById('submitAnotherButton');
+const stepMobile = document.getElementById('stepMobile');
+const stepSurvey = document.getElementById('stepSurvey');
+const stepDone = document.getElementById('stepDone');
 
 const mobileForm = document.getElementById('mobileForm');
 const feedbackForm = document.getElementById('feedbackForm');
@@ -40,6 +51,48 @@ const gpsLatInput = document.getElementById('gpsLat');
 const gpsLngInput = document.getElementById('gpsLng');
 
 let currentMobile = '';
+
+function setStep(activeStep) {
+  const mapping = {
+    mobile: stepMobile,
+    survey: stepSurvey,
+    done: stepDone,
+  };
+
+  Object.entries(mapping).forEach(([stepName, element]) => {
+    element.classList.toggle('active', stepName === activeStep);
+  });
+}
+
+function showMobileStep() {
+  feedbackFlow.classList.remove('hidden');
+  acknowledgementPanel.classList.add('hidden');
+  mobilePanel.classList.remove('hidden');
+  surveyPanel.classList.add('hidden');
+  lockStep(feedbackForm);
+  sessionStatus.textContent = 'Waiting for mobile number';
+  outletSubtitle.textContent = `You are submitting feedback for ${outletTitle.textContent}.`;
+  setStep('mobile');
+}
+
+function showSurveyStep() {
+  mobilePanel.classList.add('hidden');
+  surveyPanel.classList.remove('hidden');
+  unlockStep(feedbackForm);
+  sessionStatus.textContent = 'Ready to submit';
+  outletSubtitle.textContent = 'Step 2 of 3: rate the service and submit your feedback.';
+  setStep('survey');
+}
+
+function showAcknowledgementStep(feedbackId) {
+  feedbackFlow.classList.add('hidden');
+  acknowledgementPanel.classList.remove('hidden');
+  acknowledgementOutlet.textContent = outletTitle.textContent;
+  acknowledgementFeedbackId.textContent = `Feedback reference: ${feedbackId}`;
+  acknowledgementMessage.textContent = 'Your feedback has been submitted successfully. Thank you for helping improve the free air service.';
+  outletSubtitle.textContent = 'Submission complete. You may now close this page.';
+  setStep('done');
+}
 
 function showToast(message, type = 'success') {
   toast.textContent = message;
@@ -200,8 +253,7 @@ mobileForm.addEventListener('submit', async (event) => {
   }
 
   currentMobile = mobileNumber;
-  unlockStep(feedbackForm);
-  sessionStatus.textContent = 'Ready to submit';
+  showSurveyStep();
   captureGpsInBackground();
   showToast('Great. Please complete the feedback form.');
 });
@@ -269,13 +321,25 @@ feedbackForm.addEventListener('submit', async (event) => {
     sessionStatus.textContent = 'Submitted';
     showToast(`Thanks. Feedback ${data.data.feedback_id} saved successfully.`);
     feedbackForm.reset();
+    currentMobile = '';
     if (photoHelp) {
       photoHelp.textContent = 'You can take a photo with camera or choose from gallery (max 5 MB).';
     }
+    showAcknowledgementStep(data.data.feedback_id);
   } catch (error) {
     sessionStatus.textContent = 'Ready to submit';
     showToast(error.message, 'error');
   }
+});
+
+submitAnotherButton.addEventListener('click', () => {
+  mobileForm.reset();
+  feedbackForm.reset();
+  currentMobile = '';
+  if (photoHelp) {
+    photoHelp.textContent = 'You can take a photo with camera or choose from gallery (max 5 MB).';
+  }
+  showMobileStep();
 });
 
 loadOutlet();
