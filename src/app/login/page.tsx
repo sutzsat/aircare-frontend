@@ -36,7 +36,7 @@ export default function LoginPage() {
           <h1 className="font-[var(--font-display)] text-lg font-bold" style={{ color: "var(--color-navy)" }}>
             AirCare Challenge
           </h1>
-          <p className="text-xs" style={{ color: "var(--color-muted)" }}>Staff Dashboard</p>
+          <p className="text-xs" style={{ color: "var(--color-muted)" }}>Staff Dashboard · latest build</p>
         </div>
 
         <form
