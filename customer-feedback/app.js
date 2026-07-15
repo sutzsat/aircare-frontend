@@ -7,19 +7,18 @@ const apiBase = window.__AIRCARE_API_BASE__ || '';
  *   the 127 printed QR codes -- see qr-codes/README.md in the backend repo)
  *
  * Both are supported so the already-generated QR designs work without
- * needing to be regenerated/reprinted. Falls back to the query param if
- * both are somehow present; falls back to the hardcoded default only if
- * neither is found (e.g. viewing the page directly during testing).
+ * needing to be regenerated or reprinted. There is intentionally no
+ * fallback: feedback can only be submitted through an outlet QR URL.
  */
 function resolveRoCode() {
   const params = new URLSearchParams(window.location.search);
-  const fromQuery = params.get('ro_code');
-  if (fromQuery) return fromQuery;
+  const fromQuery = params.get('ro_code')?.trim();
+  if (/^AIRCARE-[A-Za-z0-9]+$/i.test(fromQuery || '')) return fromQuery;
 
   const pathMatch = window.location.pathname.match(/AIRCARE-[A-Za-z0-9]+/);
   if (pathMatch) return pathMatch[0];
 
-  return 'AIRCARE-219578';
+  return null;
 }
 
 const roCode = resolveRoCode();
@@ -155,6 +154,17 @@ function lockStep(stepElement) {
   stepElement.classList.add('disabled');
 }
 
+function showUnavailableOutlet(message, title = 'Invalid outlet QR code') {
+  outletTitle.textContent = title;
+  outletSubtitle.textContent = message;
+  availabilityPill.textContent = 'Not available';
+  availabilityPill.style.color = '#ffd0da';
+  mobileNumberInput.disabled = true;
+  mobileSubmitButton.disabled = true;
+  lockStep(mobileForm);
+  lockStep(feedbackForm);
+}
+
 function compactPayload(payload) {
   return Object.fromEntries(
     Object.entries(payload).filter(([, value]) => value !== null && value !== undefined && value !== '')
@@ -216,20 +226,27 @@ function captureGpsInBackground() {
 }
 
 async function loadOutlet() {
+  if (!roCode) {
+    showUnavailableOutlet('Please scan the QR code displayed at an AirCare outlet to submit feedback.');
+    return;
+  }
+
   outletTitle.textContent = 'Loading outlet details...';
   availabilityPill.textContent = 'Checking outlet';
 
   try {
     const data = await apiFetch(`/api/v1/ro/${encodeURIComponent(roCode)}/validate`);
+    if (!data.data.is_active) {
+      showUnavailableOutlet('This outlet is not currently accepting feedback.', data.data.ro_name);
+      return;
+    }
+
     outletTitle.textContent = data.data.ro_name;
     outletSubtitle.textContent = `You are submitting feedback for ${data.data.ro_name}.`;
     availabilityPill.textContent = data.data.is_active ? 'Outlet active' : 'Outlet inactive';
     availabilityPill.style.color = data.data.is_active ? '#baf3ea' : '#ffd0da';
   } catch (error) {
-    outletTitle.textContent = 'Outlet not found';
-    outletSubtitle.textContent = 'This QR code does not resolve to an active outlet.';
-    availabilityPill.textContent = 'Not available';
-    availabilityPill.style.color = '#ffd0da';
+    showUnavailableOutlet('This QR code does not resolve to an active outlet.', 'Outlet not found');
     showToast(error.message, 'error');
   }
 }
