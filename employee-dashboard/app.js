@@ -79,7 +79,19 @@ function clearToken() {
   window.localStorage.removeItem('aircare_dashboard_token');
 }
 
-async function apiFetch(path, options = {}) {
+function getRefreshToken() {
+  return window.localStorage.getItem('aircare_dashboard_refresh_token') || '';
+}
+
+function setRefreshToken(token) {
+  window.localStorage.setItem('aircare_dashboard_refresh_token', token);
+}
+
+function clearRefreshToken() {
+  window.localStorage.removeItem('aircare_dashboard_refresh_token');
+}
+
+async function rawFetch(path, options = {}) {
   const token = getToken();
   const response = await fetch(`${apiBase}${path}`, {
     headers: {
@@ -97,7 +109,56 @@ async function apiFetch(path, options = {}) {
     payload = null;
   }
 
+  return { response, payload };
+}
+
+// Concurrent 401s (e.g. the Promise.all in loadDashboard) share a single
+// in-flight refresh call instead of each racing to hit /auth/refresh.
+let refreshPromise = null;
+
+function refreshAccessToken() {
+  if (!refreshPromise) {
+    refreshPromise = (async () => {
+      const refreshToken = getRefreshToken();
+      if (!refreshToken) {
+        throw new Error('Session expired. Please log in again.');
+      }
+      const { response, payload } = await rawFetch('/api/v1/auth/refresh', {
+        method: 'POST',
+        body: JSON.stringify({ refresh_token: refreshToken }),
+      });
+      if (!response.ok) {
+        throw new Error(payload?.detail?.error?.message || 'Session expired. Please log in again.');
+      }
+      setToken(payload.data.access_token);
+    })().finally(() => {
+      refreshPromise = null;
+    });
+  }
+  return refreshPromise;
+}
+
+async function apiFetch(path, options = {}) {
+  let { response, payload } = await rawFetch(path, options);
+
+  if (response.status === 401 && getRefreshToken()) {
+    try {
+      await refreshAccessToken();
+    } catch (refreshError) {
+      clearToken();
+      clearRefreshToken();
+      setAuthenticated(false);
+      throw refreshError;
+    }
+    ({ response, payload } = await rawFetch(path, options));
+  }
+
   if (!response.ok) {
+    if (response.status === 401) {
+      clearToken();
+      clearRefreshToken();
+      setAuthenticated(false);
+    }
     const message = payload?.detail?.error?.message || payload?.error?.message || payload?.detail || 'Request failed';
     const error = new Error(message);
     error.status = response.status;
@@ -274,8 +335,8 @@ function renderLeaderboard(rows) {
 
 function renderRollups(stateRollup, divisionalOffices) {
   const cards = [
-    `<div class="rollup-card"><strong>${stateRollup.scope_name}</strong><div class="muted">${stateRollup.avg_weightage.toFixed(2)} avg points</div><div class="muted">${formatNumber(stateRollup.total_feedback)} feedback</div></div>`,
-    ...divisionalOffices.map((item) => `<div class="rollup-card"><strong>${item.scope_name}</strong><div class="muted">${item.avg_weightage.toFixed(2)} avg points</div><div class="muted">${formatNumber(item.total_feedback)} feedback across ${item.ro_reporting_count}/${item.ro_count} outlets</div></div>`),
+    `<div class="rollup-card"><strong>${escapeHtml(stateRollup.scope_name)}</strong><div class="muted">${stateRollup.avg_weightage.toFixed(2)} avg points</div><div class="muted">${formatNumber(stateRollup.total_feedback)} feedback</div></div>`,
+    ...divisionalOffices.map((item) => `<div class="rollup-card"><strong>${escapeHtml(item.scope_name)}</strong><div class="muted">${item.avg_weightage.toFixed(2)} avg points</div><div class="muted">${formatNumber(item.total_feedback)} feedback across ${item.ro_reporting_count}/${item.ro_count} outlets</div></div>`),
   ];
   rollupList.innerHTML = cards.join('');
 }
@@ -502,6 +563,7 @@ loginForm.addEventListener('submit', async (event) => {
       body: JSON.stringify({ phone, password }),
     });
     setToken(response.data.access_token);
+    setRefreshToken(response.data.refresh_token);
     setAuthenticated(true);
     await loadDashboard();
     showToast('Dashboard login successful.');
@@ -520,9 +582,20 @@ refreshButton.addEventListener('click', async () => {
 });
 
 logoutButton.addEventListener('click', () => {
+  const refreshToken = getRefreshToken();
   clearToken();
+  clearRefreshToken();
   setAuthenticated(false);
   showToast('Logged out.');
+
+  if (refreshToken) {
+    // Best-effort server-side revocation; local session is already cleared
+    // above regardless of whether this call succeeds.
+    rawFetch('/api/v1/auth/logout', {
+      method: 'POST',
+      body: JSON.stringify({ refresh_token: refreshToken }),
+    }).catch(() => {});
+  }
 });
 
 async function bootstrap() {
@@ -577,14 +650,14 @@ async function populateScopeOptions() {
 
   if (currentUserContext.role === 'DO_ADMIN') {
     // DO Head creates a Field Officer -- outlet dropdown scoped to their
-    // own DO only, reusing the already-scoped leaderboard data rather
-    // than adding a new endpoint.
+    // own DO. Uses feedback-outlets (filtered only by is_active) rather
+    // than the leaderboard, which only lists outlets with a ranking row
+    // for today and would otherwise hide any outlet that hasn't scored yet.
     userModalTitle.textContent = 'Add Field Officer';
-    scopeIdField.querySelector('label') ?? null;
     scopeIdField.firstChild.textContent = 'Outlet (within your Divisional Office)';
-    const leaderboard = await apiFetch('/api/v1/dashboard/leaderboard?limit=200');
-    newUserScopeId.innerHTML = leaderboard.data.leaderboard
-      .map((row) => `<option value="${row.ro_id}">${row.ro_name}</option>`)
+    const outlets = await apiFetch('/api/v1/dashboard/feedback-outlets');
+    newUserScopeId.innerHTML = outlets.data.outlets
+      .map((row) => `<option value="${row.ro_id}">${escapeHtml(row.ro_name)}</option>`)
       .join('');
   } else {
     // SUPER_ADMIN / STATE_ADMIN create a Divisional Head -- DO dropdown.
@@ -592,7 +665,7 @@ async function populateScopeOptions() {
     scopeIdField.firstChild.textContent = 'Divisional Office';
     const rollups = await apiFetch('/api/v1/dashboard/rollups');
     newUserScopeId.innerHTML = rollups.data.divisional_offices
-      .map((row) => `<option value="${row.scope_id}">${row.scope_name}</option>`)
+      .map((row) => `<option value="${row.scope_id}">${escapeHtml(row.scope_name)}</option>`)
       .join('');
   }
 }
