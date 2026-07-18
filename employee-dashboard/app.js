@@ -585,6 +585,10 @@ function renderFeedbackDetail(item) {
     ${canReview ? `
       <div class="feedback-detail-section">
         <span class="detail-label">This feedback is flagged for review (anomalous volume vs trailing average)</span>
+        <label>
+          Reason (required to reject; optional to approve)
+          <textarea id="reviewReasonInput" rows="2" placeholder="e.g. Suspicious volume pattern, confirmed with outlet staff"></textarea>
+        </label>
         <div class="modal-actions">
           <button class="ghost-button" type="button" id="rejectFeedbackButton" data-feedback-id="${item.feedback_id}">Reject</button>
           <button class="primary-button" type="button" id="approveFeedbackButton" data-feedback-id="${item.feedback_id}">Approve</button>
@@ -982,13 +986,16 @@ feedbackDetailBody.addEventListener('click', async (event) => {
 
   const feedbackId = (approveTrigger || rejectTrigger).dataset.feedbackId;
   const decision = approveTrigger ? 'APPROVE' : 'REJECT';
-  const reason = decision === 'REJECT'
-    ? window.prompt('Reason for rejecting this feedback:', 'Suspicious volume pattern')
-    : 'Reviewed and approved by dashboard staff.';
+  const reasonInput = document.getElementById('reviewReasonInput');
+  const typedReason = reasonInput ? reasonInput.value.trim() : '';
 
-  if (decision === 'REJECT' && !reason) {
-    return; // reviewer cancelled the prompt
+  if (decision === 'REJECT' && !typedReason) {
+    showToast('Enter a reason before rejecting this feedback.', 'error');
+    reasonInput?.focus();
+    return;
   }
+
+  const reason = typedReason || 'Reviewed and approved by dashboard staff.';
 
   try {
     await apiFetch(`/api/v1/admin/feedback/${encodeURIComponent(feedbackId)}/review`, {
