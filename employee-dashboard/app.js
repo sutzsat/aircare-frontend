@@ -415,19 +415,22 @@ function renderSpecialRecognition(categories) {
   }).join('');
 }
 
-function renderLuckyDrawWinners(winners) {
+function renderLuckyDrawWinners(winners, doNameById) {
   if (!luckyDrawWinnersList) return;
   if (!winners.length) {
     luckyDrawWinnersList.innerHTML = '<div class="muted">No draws run yet.</div>';
     return;
   }
-  luckyDrawWinnersList.innerHTML = winners.map((w) => `
-    <div class="rollup-card">
-      <strong>Fortnight ${w.fortnight_number} • DO ${w.do_id}</strong>
-      <div class="muted">${escapeHtml(w.mobile_number_masked)} • ₹${formatNumber(w.reward_amount)}</div>
-      <div class="muted">${w.fortnight_start} to ${w.fortnight_end}</div>
-    </div>
-  `).join('');
+  luckyDrawWinnersList.innerHTML = winners.map((w) => {
+    const doName = doNameById.get(w.do_id) || `DO ${w.do_id}`;
+    return `
+      <div class="rollup-card">
+        <strong>Fortnight ${w.fortnight_number} • ${escapeHtml(doName)}</strong>
+        <div class="muted">${escapeHtml(w.mobile_number_masked)} • ₹${formatNumber(w.reward_amount)}</div>
+        <div class="muted">${w.fortnight_start} to ${w.fortnight_end}</div>
+      </div>
+    `;
+  }).join('');
 }
 
 function renderRecentFeedback(items) {
@@ -639,14 +642,14 @@ async function loadAwards(scopeType, todayIso) {
   renderSpecialRecognition(specialResponse.data.categories);
 }
 
-async function loadLuckyDrawPanel(role) {
+async function loadLuckyDrawPanel(role, doNameById) {
   if (!luckyDrawPanel) return;
   const canRunDraw = role === 'SUPER_ADMIN' || role === 'STATE_ADMIN';
   luckyDrawPanel.classList.toggle('hidden', !canRunDraw);
   if (!canRunDraw) return;
 
   const response = await apiFetch('/api/v1/admin/lucky-draw/winners');
-  renderLuckyDrawWinners(response.data.winners);
+  renderLuckyDrawWinners(response.data.winners, doNameById);
 }
 
 async function loadDashboard() {
@@ -688,8 +691,9 @@ async function loadDashboard() {
   // Award panels are supplementary -- a hiccup here shouldn't block the
   // core dashboard (metrics/leaderboard/feedback) from having loaded fine.
   try {
+    const doNameById = new Map(rollups.data.divisional_offices.map((row) => [row.scope_id, row.scope_name]));
     await loadAwards(me.data.scope_type, scoreDate || today);
-    await loadLuckyDrawPanel(me.data.role);
+    await loadLuckyDrawPanel(me.data.role, doNameById);
   } catch (error) {
     console.error('Failed to load award panels', error);
   }
