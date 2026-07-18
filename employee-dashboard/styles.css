@@ -534,11 +534,14 @@ th {
     align-items: stretch;
   }
 }
-/* Password change / user management modals */
+/* Modals -- share the same tokens (--card, --shadow, --line, radius scale)
+   as the rest of the dashboard rather than a separate flat-white system, so
+   Change Password / Manage Users / Lucky Draw / Feedback Detail read as the
+   same product as everything behind them. */
 .modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(15, 15, 20, 0.55);
+  background: rgba(31, 20, 12, 0.55);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -547,36 +550,30 @@ th {
 }
 
 .modal-card {
-  background: #fff;
-  border-radius: 16px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(12px);
+  border-radius: 28px;
   padding: 28px;
   width: 100%;
   max-width: 420px;
   max-height: 85vh;
   overflow-y: auto;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25);
+  display: grid;
+  gap: 16px;
+  align-content: start;
 }
 
 .modal-card h2 {
-  margin: 0 0 16px;
+  margin: 0;
   font-family: 'Space Grotesk', sans-serif;
+  color: var(--ink);
 }
 
-.modal-card label {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  font-size: 13px;
-  margin-bottom: 14px;
-  color: #4a4a55;
-}
-
-.modal-card input,
-.modal-card select {
-  padding: 10px 12px;
-  border-radius: 8px;
-  border: 1px solid #d8d8e0;
-  font-size: 14px;
+#createUserForm {
+  display: grid;
+  gap: 16px;
 }
 
 .modal-actions {
@@ -587,16 +584,22 @@ th {
 }
 
 .user-list {
-  margin-top: 20px;
+  margin-top: 4px;
   padding-top: 16px;
-  border-top: 1px solid #eaeaf0;
+  border-top: 1px solid var(--line);
+}
+
+.user-list h3 {
+  margin: 0 0 12px;
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 1.05rem;
 }
 
 .user-row {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 8px 0;
-  border-bottom: 1px solid #f2f2f6;
-  font-size: 13px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 0.88rem;
 }
