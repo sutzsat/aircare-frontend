@@ -3,13 +3,77 @@
   --ink: #1f1b17;
   --muted: #6e6259;
   --card: rgba(255, 250, 244, 0.88);
+  --surface: rgba(255, 255, 255, 0.65);
+  --surface-solid: #fffaf5;
   --line: rgba(52, 38, 28, 0.1);
+  --line-soft: rgba(52, 38, 28, 0.08);
+  --input-bg: rgba(255, 255, 255, 0.7);
+  --overlay: rgba(31, 20, 12, 0.55);
   --accent: #d2601a;
   --accent-soft: #ffcc99;
   --accent-deep: #7a2e0a;
+  --accent-bg: rgba(210, 96, 26, 0.12);
   --success: #1f7a5c;
+  --success-bg: rgba(31, 122, 92, 0.12);
   --warn: #b85c38;
+  --warn-bg: rgba(184, 92, 56, 0.12);
   --shadow: 0 24px 60px rgba(76, 52, 31, 0.12);
+  --bg-gradient:
+    radial-gradient(circle at top left, rgba(210, 96, 26, 0.18), transparent 28%),
+    radial-gradient(circle at top right, rgba(255, 204, 153, 0.6), transparent 24%),
+    linear-gradient(180deg, #fbf6ef 0%, #f2e7d6 100%);
+  --trend-bg: linear-gradient(180deg, rgba(255, 255, 255, 0.65), rgba(248, 236, 220, 0.9));
+
+  /* Spacing scale -- every padding/gap/margin in this file picks one of
+     these rather than a one-off number, so a new panel/component can't
+     quietly drift from the rest (see the .panel-wide incident). */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-7: 28px;
+  --space-8: 32px;
+  --space-9: 40px;
+
+  /* Radius scale, same reasoning. */
+  --radius-sm: 12px;
+  --radius-md: 16px;
+  --radius-lg: 20px;
+  --radius-xl: 24px;
+  --radius-2xl: 28px;
+  --radius-3xl: 32px;
+  --radius-full: 999px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #17130f;
+    --ink: #f3ece2;
+    --muted: #a89a8c;
+    --card: rgba(36, 29, 23, 0.82);
+    --surface: rgba(255, 255, 255, 0.06);
+    --surface-solid: #241d17;
+    --line: rgba(255, 235, 215, 0.14);
+    --line-soft: rgba(255, 235, 215, 0.09);
+    --input-bg: rgba(255, 255, 255, 0.05);
+    --overlay: rgba(0, 0, 0, 0.65);
+    --accent: #ff8a3d;
+    --accent-soft: #4a2a12;
+    --accent-deep: #ffb680;
+    --accent-bg: rgba(255, 138, 61, 0.16);
+    --success: #5cd3a8;
+    --success-bg: rgba(92, 211, 168, 0.16);
+    --warn: #ef9a72;
+    --warn-bg: rgba(239, 154, 114, 0.16);
+    --shadow: 0 24px 60px rgba(0, 0, 0, 0.5);
+    --bg-gradient:
+      radial-gradient(circle at top left, rgba(255, 138, 61, 0.14), transparent 28%),
+      radial-gradient(circle at top right, rgba(255, 138, 61, 0.07), transparent 24%),
+      linear-gradient(180deg, #1b1611 0%, #100d0a 100%);
+    --trend-bg: linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 235, 215, 0.02));
+  }
 }
 
 * {
@@ -21,16 +85,13 @@ body {
   min-height: 100vh;
   color: var(--ink);
   font-family: Manrope, sans-serif;
-  background:
-    radial-gradient(circle at top left, rgba(210, 96, 26, 0.18), transparent 28%),
-    radial-gradient(circle at top right, rgba(255, 204, 153, 0.6), transparent 24%),
-    linear-gradient(180deg, #fbf6ef 0%, #f2e7d6 100%);
+  background: var(--bg-gradient);
 }
 
 .dashboard-shell {
   width: min(1320px, calc(100% - 32px));
   margin: 0 auto;
-  padding: 24px 0 40px;
+  padding: var(--space-6) 0 var(--space-9);
 }
 
 .hidden {
@@ -39,7 +100,7 @@ body {
 
 .eyebrow,
 .card-label {
-  margin: 0 0 10px;
+  margin: 0 0 var(--space-2);
   text-transform: uppercase;
   letter-spacing: 0.18em;
   font-size: 0.72rem;
@@ -62,7 +123,7 @@ h2 {
   min-height: calc(100vh - 64px);
   display: grid;
   grid-template-columns: 1.2fr 0.9fr;
-  gap: 24px;
+  gap: var(--space-6);
   align-items: center;
 }
 
@@ -79,14 +140,14 @@ h2 {
 }
 
 .brand-block {
-  border-radius: 34px;
-  padding: 40px;
+  border-radius: var(--radius-3xl);
+  padding: var(--space-9);
 }
 
 .brand-block h1 {
   font-size: clamp(2.8rem, 5vw, 4.9rem);
   line-height: 0.94;
-  margin-bottom: 18px;
+  margin-bottom: var(--space-5);
 }
 
 .lead {
@@ -97,62 +158,37 @@ h2 {
 }
 
 .auth-card {
-  border-radius: 28px;
-  padding: 28px;
+  border-radius: var(--radius-2xl);
+  padding: var(--space-7);
   display: grid;
-  gap: 16px;
+  gap: var(--space-4);
 }
 
 label {
   display: grid;
-  gap: 8px;
+  gap: var(--space-2);
   color: var(--ink);
   font-size: 0.95rem;
 }
 
-input {
+input,
+select,
+textarea {
   width: 100%;
-  border: 1px solid rgba(52, 38, 28, 0.12);
-  border-radius: 16px;
-  padding: 14px 16px;
-  background: rgba(255, 255, 255, 0.7);
-  color: var(--ink);
-  font: inherit;
-}
-
-select {
-  width: 100%;
-  border: 1px solid rgba(52, 38, 28, 0.12);
-  border-radius: 16px;
-  padding: 14px 16px;
-  background: rgba(255, 255, 255, 0.7);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  padding: var(--space-4) var(--space-4);
+  background: var(--input-bg);
   color: var(--ink);
   font: inherit;
 }
 
 textarea {
-  width: 100%;
-  border: 1px solid rgba(52, 38, 28, 0.12);
-  border-radius: 16px;
-  padding: 14px 16px;
-  background: rgba(255, 255, 255, 0.7);
-  color: var(--ink);
-  font: inherit;
   resize: vertical;
 }
 
-input:focus {
-  outline: none;
-  border-color: rgba(210, 96, 26, 0.6);
-  box-shadow: 0 0 0 4px rgba(210, 96, 26, 0.14);
-}
-
-select:focus {
-  outline: none;
-  border-color: rgba(210, 96, 26, 0.6);
-  box-shadow: 0 0 0 4px rgba(210, 96, 26, 0.14);
-}
-
+input:focus,
+select:focus,
 textarea:focus {
   outline: none;
   border-color: rgba(210, 96, 26, 0.6);
@@ -162,8 +198,8 @@ textarea:focus {
 .primary-button,
 .ghost-button {
   border: 0;
-  border-radius: 16px;
-  padding: 14px 18px;
+  border-radius: var(--radius-md);
+  padding: var(--space-4) var(--space-5);
   font: inherit;
   font-weight: 800;
   cursor: pointer;
@@ -175,9 +211,15 @@ textarea:focus {
 }
 
 .ghost-button {
-  background: rgba(255, 255, 255, 0.62);
+  background: var(--surface);
   color: var(--accent-deep);
-  border: 1px solid rgba(52, 38, 28, 0.1);
+  border: 1px solid var(--line);
+}
+
+.primary-button:disabled,
+.ghost-button:disabled {
+  opacity: 0.6;
+  cursor: progress;
 }
 
 .hint {
@@ -185,64 +227,92 @@ textarea:focus {
   font-size: 0.9rem;
 }
 
+/* Loading states -- a spinner + label swap on the triggering button, and a
+   soft dim on the panels it's refreshing, so async fetches never look like
+   the app just froze. */
+.spinner {
+  display: inline-block;
+  width: 13px;
+  height: 13px;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  vertical-align: -2px;
+  margin-right: var(--space-2);
+  animation: spin 0.6s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.app-shell.is-loading .metric-grid,
+.app-shell.is-loading .insight-grid {
+  opacity: 0.5;
+  pointer-events: none;
+  transition: opacity 160ms ease;
+}
+
 .app-shell {
   display: grid;
-  gap: 18px;
+  gap: var(--space-5);
 }
 
 .hero-banner {
-  border-radius: 30px;
-  padding: 28px;
+  border-radius: var(--radius-2xl);
+  padding: var(--space-7);
   display: flex;
   justify-content: space-between;
-  gap: 20px;
+  gap: var(--space-5);
   align-items: flex-start;
 }
 
 .hero-banner h1 {
   font-size: clamp(2rem, 4vw, 3.6rem);
-  margin-bottom: 12px;
+  margin-bottom: var(--space-3);
 }
 
 .hero-actions {
   display: grid;
-  gap: 12px;
+  gap: var(--space-3);
   justify-items: end;
 }
 
 .scope-chip {
-  padding: 10px 14px;
-  border-radius: 999px;
-  background: rgba(210, 96, 26, 0.12);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-full);
+  background: var(--accent-bg);
   color: var(--accent-deep);
   font-weight: 700;
 }
 
 .control-bar {
-  border-radius: 24px;
-  padding: 18px;
+  border-radius: var(--radius-xl);
+  padding: var(--space-4);
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 12px;
+  gap: var(--space-3);
   align-items: end;
 }
 
 .metric-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 14px;
+  gap: var(--space-4);
 }
 
 .metric-card {
-  border-radius: 24px;
-  padding: 20px;
+  border-radius: var(--radius-xl);
+  padding: var(--space-5);
 }
 
 .metric-card strong {
   display: block;
   font-family: "Space Grotesk", sans-serif;
   font-size: 2rem;
-  margin-bottom: 8px;
+  margin-bottom: var(--space-2);
 }
 
 .metric-card span {
@@ -253,7 +323,7 @@ textarea:focus {
 .insight-grid {
   display: grid;
   grid-template-columns: 1.35fr 0.8fr 0.8fr;
-  gap: 16px;
+  gap: var(--space-4);
 }
 
 .lower-grid {
@@ -261,8 +331,8 @@ textarea:focus {
 }
 
 .panel {
-  border-radius: 26px;
-  padding: 22px;
+  border-radius: var(--radius-xl);
+  padding: var(--space-6);
 }
 
 .panel-wide {
@@ -272,8 +342,8 @@ textarea:focus {
 .panel-head {
   display: flex;
   justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 16px;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
 }
 
 .chart-card,
@@ -283,48 +353,48 @@ textarea:focus {
 .rollup-list,
 .feedback-list {
   display: grid;
-  gap: 12px;
+  gap: var(--space-3);
 }
 
 .feedback-filter-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
-  margin-bottom: 12px;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
 }
 
 .feedback-filter-actions,
 .feedback-pagination,
 .feedback-pagination-actions {
   display: flex;
-  gap: 12px;
+  gap: var(--space-3);
   align-items: center;
 }
 
 .feedback-filter-actions,
 .feedback-pagination {
   justify-content: space-between;
-  margin-bottom: 14px;
+  margin-bottom: var(--space-4);
 }
 
 .table-secondary {
-  margin-top: 4px;
+  margin-top: var(--space-1);
   font-size: 0.84rem;
 }
 
 .trend-svg {
   width: 100%;
   height: 260px;
-  border-radius: 18px;
-  background: linear-gradient(180deg, rgba(255,255,255,0.65), rgba(248, 236, 220, 0.9));
-  border: 1px solid rgba(52, 38, 28, 0.08);
+  border-radius: var(--radius-lg);
+  background: var(--trend-bg);
+  border: 1px solid var(--line-soft);
 }
 
 .stack-bar {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   overflow: hidden;
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   height: 18px;
 }
 
@@ -337,7 +407,7 @@ textarea:focus {
 .rollup-card,
 .feedback-item {
   display: grid;
-  gap: 8px;
+  gap: var(--space-2);
 }
 
 .legend-row {
@@ -345,10 +415,10 @@ textarea:focus {
 }
 
 .legend-pill {
-  padding: 10px 12px;
-  border-radius: 16px;
-  background: rgba(255,255,255,0.7);
-  border: 1px solid rgba(52, 38, 28, 0.08);
+  padding: var(--space-3) var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  border: 1px solid var(--line-soft);
 }
 
 .issue-row {
@@ -358,8 +428,8 @@ textarea:focus {
 
 .issue-track {
   height: 12px;
-  border-radius: 999px;
-  background: rgba(210, 96, 26, 0.12);
+  border-radius: var(--radius-full);
+  background: var(--accent-bg);
   overflow: hidden;
 }
 
@@ -377,8 +447,8 @@ table {
 th,
 td {
   text-align: left;
-  padding: 12px 10px;
-  border-bottom: 1px solid rgba(52, 38, 28, 0.08);
+  padding: var(--space-3) var(--space-3);
+  border-bottom: 1px solid var(--line-soft);
   font-size: 0.92rem;
 }
 
@@ -393,26 +463,26 @@ th {
 .status-badge {
   display: inline-flex;
   align-items: center;
-  padding: 6px 10px;
-  border-radius: 999px;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-full);
   font-size: 0.82rem;
   font-weight: 700;
 }
 
 .rank-badge {
-  background: rgba(210, 96, 26, 0.12);
+  background: var(--accent-bg);
   color: var(--accent-deep);
 }
 
-.status-valid { background: rgba(31, 122, 92, 0.12); color: var(--success); }
-.status-flagged, .status-rejected, .status-under_review { background: rgba(184, 92, 56, 0.12); color: var(--warn); }
+.status-valid { background: var(--success-bg); color: var(--success); }
+.status-flagged, .status-rejected, .status-under_review { background: var(--warn-bg); color: var(--warn); }
 
 .rollup-card,
 .feedback-item {
-  padding: 14px;
-  border-radius: 18px;
-  background: rgba(255,255,255,0.65);
-  border: 1px solid rgba(52, 38, 28, 0.08);
+  padding: var(--space-4);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  border: 1px solid var(--line-soft);
 }
 
 .feedback-topline,
@@ -420,7 +490,7 @@ th {
 .feedback-detail-header {
   display: flex;
   justify-content: space-between;
-  gap: 12px;
+  gap: var(--space-3);
   align-items: center;
 }
 
@@ -429,8 +499,8 @@ th {
 }
 
 .inline-action {
-  padding: 10px 14px;
-  border-radius: 12px;
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-sm);
   font-size: 0.88rem;
   text-decoration: none;
 }
@@ -441,23 +511,23 @@ th {
 
 .feedback-detail-body {
   display: grid;
-  gap: 16px;
+  gap: var(--space-4);
 }
 
 .feedback-detail-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
+  gap: var(--space-3);
 }
 
 .detail-card,
 .feedback-detail-section {
   display: grid;
-  gap: 8px;
-  padding: 14px;
-  border-radius: 14px;
-  background: #fffaf5;
-  border: 1px solid rgba(52, 38, 28, 0.08);
+  gap: var(--space-2);
+  padding: var(--space-4);
+  border-radius: var(--radius-sm);
+  background: var(--surface-solid);
+  border: 1px solid var(--line-soft);
 }
 
 .detail-label {
@@ -481,13 +551,13 @@ th {
 .toast {
   position: fixed;
   left: 50%;
-  bottom: 24px;
+  bottom: var(--space-6);
   transform: translateX(-50%);
   min-width: min(560px, calc(100% - 24px));
   background: rgba(39, 24, 16, 0.94);
   color: #fff8f0;
-  padding: 14px 18px;
-  border-radius: 16px;
+  padding: var(--space-4) var(--space-5);
+  border-radius: var(--radius-md);
   box-shadow: var(--shadow);
   opacity: 0;
   pointer-events: none;
@@ -534,6 +604,7 @@ th {
     align-items: stretch;
   }
 }
+
 /* Modals -- share the same tokens (--card, --shadow, --line, radius scale)
    as the rest of the dashboard rather than a separate flat-white system, so
    Change Password / Manage Users / Lucky Draw / Feedback Detail read as the
@@ -541,12 +612,12 @@ th {
 .modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(31, 20, 12, 0.55);
+  background: var(--overlay);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 50;
-  padding: 16px;
+  padding: var(--space-4);
 }
 
 .modal-card {
@@ -554,14 +625,14 @@ th {
   border: 1px solid var(--line);
   box-shadow: var(--shadow);
   backdrop-filter: blur(12px);
-  border-radius: 28px;
-  padding: 28px;
+  border-radius: var(--radius-2xl);
+  padding: var(--space-7);
   width: 100%;
   max-width: 420px;
   max-height: 85vh;
   overflow-y: auto;
   display: grid;
-  gap: 16px;
+  gap: var(--space-4);
   align-content: start;
 }
 
@@ -573,24 +644,24 @@ th {
 
 #createUserForm {
   display: grid;
-  gap: 16px;
+  gap: var(--space-4);
 }
 
 .modal-actions {
   display: flex;
   justify-content: flex-end;
-  gap: 10px;
-  margin-top: 8px;
+  gap: var(--space-3);
+  margin-top: var(--space-2);
 }
 
 .user-list {
-  margin-top: 4px;
-  padding-top: 16px;
+  margin-top: var(--space-1);
+  padding-top: var(--space-4);
   border-top: 1px solid var(--line);
 }
 
 .user-list h3 {
-  margin: 0 0 12px;
+  margin: 0 0 var(--space-3);
   font-family: 'Space Grotesk', sans-serif;
   font-size: 1.05rem;
 }
@@ -599,7 +670,7 @@ th {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 10px 0;
+  padding: var(--space-3) 0;
   border-bottom: 1px solid var(--line);
   font-size: 0.88rem;
 }

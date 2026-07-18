@@ -108,6 +108,26 @@ function showToast(message, type = 'success') {
   }, 3500);
 }
 
+// Swaps a button's label for a spinner + status text and disables it while
+// an async action is in flight, so every fetch has a visible loading state
+// instead of the UI just sitting there until the response lands.
+function setButtonLoading(button, isLoading, loadingLabel = 'Loading…') {
+  if (!button) return;
+  if (isLoading) {
+    if (button.dataset.originalLabel === undefined) {
+      button.dataset.originalLabel = button.innerHTML;
+    }
+    button.disabled = true;
+    button.innerHTML = `<span class="spinner"></span>${loadingLabel}`;
+  } else {
+    button.disabled = false;
+    if (button.dataset.originalLabel !== undefined) {
+      button.innerHTML = button.dataset.originalLabel;
+      delete button.dataset.originalLabel;
+    }
+  }
+}
+
 function getToken() {
   return window.localStorage.getItem('aircare_dashboard_token') || '';
 }
@@ -661,45 +681,50 @@ async function loadDashboard() {
   const trendStart = trendStartInput.value;
   const trendEnd = trendEndInput.value;
 
-  const [me, overview, leaderboard, trend, rollups, recentFeedbackResponse, feedbackOutletsResponse] = await Promise.all([
-    apiFetch('/api/v1/dashboard/me'),
-    apiFetch(`/api/v1/dashboard/overview?score_date=${encodeURIComponent(scoreDate)}`),
-    apiFetch(`/api/v1/dashboard/leaderboard?score_date=${encodeURIComponent(scoreDate)}&limit=10`),
-    apiFetch(`/api/v1/dashboard/trend?start_date=${encodeURIComponent(trendStart)}&end_date=${encodeURIComponent(trendEnd)}`),
-    apiFetch(`/api/v1/dashboard/rollups?score_date=${encodeURIComponent(scoreDate)}`),
-    apiFetch(`/api/v1/dashboard/recent-feedback?score_date=${encodeURIComponent(scoreDate)}&limit=12`),
-    apiFetch('/api/v1/dashboard/feedback-outlets'),
-  ]);
-
-  scopeTitle.textContent = me.data.scope_label;
-  scopeSubtitle.textContent = `${me.data.role.replace('_', ' ')} access • Live view of air-service feedback and Happy Points.`;
-  roleChip.textContent = `${me.data.role.replace('_', ' ')} • ${me.data.scope_type}`;
-  currentUserContext = me.data;
-
-  // Per the backend hierarchy (CREATABLE_ROLES_BY_CREATOR in admin.py):
-  // only SUPER_ADMIN, STATE_ADMIN, and DO_ADMIN can create anyone at all.
-  // District Admin and Field Officers (RO_USER) never see this button.
-  const canManageUsers = ['SUPER_ADMIN', 'STATE_ADMIN', 'DO_ADMIN'].includes(me.data.role);
-  manageUsersButton.classList.toggle('hidden', !canManageUsers);
-
-  renderMetrics(overview.data.metrics);
-  renderRecommendationChart(overview.data.recommendation_split);
-  renderIssueChart(overview.data.issue_hotspots);
-  renderTrendChart(trend.data.trend);
-  renderLeaderboard(leaderboard.data.leaderboard);
-  renderRollups(rollups.data.state, rollups.data.divisional_offices);
-  renderRecentFeedback(recentFeedbackResponse.data.items);
-  populateFeedbackOutletFilter(feedbackOutletsResponse.data.outlets);
-  await loadFeedbackExplorer(1);
-
-  // Award panels are supplementary -- a hiccup here shouldn't block the
-  // core dashboard (metrics/leaderboard/feedback) from having loaded fine.
+  appShell.classList.add('is-loading');
   try {
-    const doNameById = new Map(rollups.data.divisional_offices.map((row) => [row.scope_id, row.scope_name]));
-    await loadAwards(me.data.scope_type, scoreDate || today);
-    await loadLuckyDrawPanel(me.data.role, doNameById);
-  } catch (error) {
-    console.error('Failed to load award panels', error);
+    const [me, overview, leaderboard, trend, rollups, recentFeedbackResponse, feedbackOutletsResponse] = await Promise.all([
+      apiFetch('/api/v1/dashboard/me'),
+      apiFetch(`/api/v1/dashboard/overview?score_date=${encodeURIComponent(scoreDate)}`),
+      apiFetch(`/api/v1/dashboard/leaderboard?score_date=${encodeURIComponent(scoreDate)}&limit=10`),
+      apiFetch(`/api/v1/dashboard/trend?start_date=${encodeURIComponent(trendStart)}&end_date=${encodeURIComponent(trendEnd)}`),
+      apiFetch(`/api/v1/dashboard/rollups?score_date=${encodeURIComponent(scoreDate)}`),
+      apiFetch(`/api/v1/dashboard/recent-feedback?score_date=${encodeURIComponent(scoreDate)}&limit=12`),
+      apiFetch('/api/v1/dashboard/feedback-outlets'),
+    ]);
+
+    scopeTitle.textContent = me.data.scope_label;
+    scopeSubtitle.textContent = `${me.data.role.replace('_', ' ')} access • Live view of air-service feedback and Happy Points.`;
+    roleChip.textContent = `${me.data.role.replace('_', ' ')} • ${me.data.scope_type}`;
+    currentUserContext = me.data;
+
+    // Per the backend hierarchy (CREATABLE_ROLES_BY_CREATOR in admin.py):
+    // only SUPER_ADMIN, STATE_ADMIN, and DO_ADMIN can create anyone at all.
+    // District Admin and Field Officers (RO_USER) never see this button.
+    const canManageUsers = ['SUPER_ADMIN', 'STATE_ADMIN', 'DO_ADMIN'].includes(me.data.role);
+    manageUsersButton.classList.toggle('hidden', !canManageUsers);
+
+    renderMetrics(overview.data.metrics);
+    renderRecommendationChart(overview.data.recommendation_split);
+    renderIssueChart(overview.data.issue_hotspots);
+    renderTrendChart(trend.data.trend);
+    renderLeaderboard(leaderboard.data.leaderboard);
+    renderRollups(rollups.data.state, rollups.data.divisional_offices);
+    renderRecentFeedback(recentFeedbackResponse.data.items);
+    populateFeedbackOutletFilter(feedbackOutletsResponse.data.outlets);
+    await loadFeedbackExplorer(1);
+
+    // Award panels are supplementary -- a hiccup here shouldn't block the
+    // core dashboard (metrics/leaderboard/feedback) from having loaded fine.
+    try {
+      const doNameById = new Map(rollups.data.divisional_offices.map((row) => [row.scope_id, row.scope_name]));
+      await loadAwards(me.data.scope_type, scoreDate || today);
+      await loadLuckyDrawPanel(me.data.role, doNameById);
+    } catch (error) {
+      console.error('Failed to load award panels', error);
+    }
+  } finally {
+    appShell.classList.remove('is-loading');
   }
 }
 
@@ -707,7 +732,9 @@ loginForm.addEventListener('submit', async (event) => {
   event.preventDefault();
   const phone = document.getElementById('phone').value.trim();
   const password = document.getElementById('password').value;
+  const signInButton = loginForm.querySelector('button[type=submit]');
 
+  setButtonLoading(signInButton, true, 'Signing in…');
   try {
     const response = await apiFetch('/api/v1/auth/login', {
       method: 'POST',
@@ -720,15 +747,20 @@ loginForm.addEventListener('submit', async (event) => {
     showToast('Dashboard login successful.');
   } catch (error) {
     showToast(error.message, 'error');
+  } finally {
+    setButtonLoading(signInButton, false);
   }
 });
 
 refreshButton.addEventListener('click', async () => {
+  setButtonLoading(refreshButton, true, 'Refreshing…');
   try {
     await loadDashboard();
     showToast('Dashboard refreshed.');
   } catch (error) {
     showToast(error.message, 'error');
+  } finally {
+    setButtonLoading(refreshButton, false);
   }
 });
 
@@ -781,7 +813,9 @@ passwordForm.addEventListener('submit', async (event) => {
   event.preventDefault();
   const currentPassword = document.getElementById('currentPassword').value;
   const newPassword = document.getElementById('newPassword').value;
+  const submitButton = passwordForm.querySelector('button[type=submit]');
 
+  setButtonLoading(submitButton, true, 'Updating…');
   try {
     await apiFetch('/api/v1/auth/change-password', {
       method: 'POST',
@@ -791,6 +825,8 @@ passwordForm.addEventListener('submit', async (event) => {
     showToast('Password updated successfully.');
   } catch (error) {
     showToast(error.message, 'error');
+  } finally {
+    setButtonLoading(submitButton, false);
   }
 });
 
@@ -840,12 +876,15 @@ async function loadExistingUsers() {
 }
 
 manageUsersButton.addEventListener('click', async () => {
+  setButtonLoading(manageUsersButton, true, 'Loading…');
   try {
     await populateScopeOptions();
     await loadExistingUsers();
     userModalOverlay.classList.remove('hidden');
   } catch (error) {
     showToast(error.message, 'error');
+  } finally {
+    setButtonLoading(manageUsersButton, false);
   }
 });
 
@@ -870,10 +909,13 @@ if (recentFeedback) {
       return;
     }
 
+    setButtonLoading(trigger, true, 'Loading…');
     try {
       await openFeedbackDetail(trigger.dataset.feedbackId);
     } catch (error) {
       showToast(error.message, 'error');
+    } finally {
+      setButtonLoading(trigger, false);
     }
   });
 }
@@ -884,19 +926,25 @@ feedbackTable.addEventListener('click', async (event) => {
     return;
   }
 
+  setButtonLoading(trigger, true, 'Loading…');
   try {
     await openFeedbackDetail(trigger.dataset.feedbackId);
   } catch (error) {
     showToast(error.message, 'error');
+  } finally {
+    setButtonLoading(trigger, false);
   }
 });
 
 applyFeedbackFiltersButton.addEventListener('click', async () => {
+  setButtonLoading(applyFeedbackFiltersButton, true, 'Applying…');
   try {
     await loadFeedbackExplorer(1);
     showToast('Feedback filters applied.');
   } catch (error) {
     showToast(error.message, 'error');
+  } finally {
+    setButtonLoading(applyFeedbackFiltersButton, false);
   }
 });
 
@@ -906,29 +954,43 @@ resetFeedbackFiltersButton.addEventListener('click', async () => {
   feedbackStatusFilter.value = '';
   feedbackOutletFilter.value = '';
 
+  setButtonLoading(resetFeedbackFiltersButton, true, 'Resetting…');
   try {
     await loadFeedbackExplorer(1);
     showToast('Feedback filters reset.');
   } catch (error) {
     showToast(error.message, 'error');
+  } finally {
+    setButtonLoading(resetFeedbackFiltersButton, false);
   }
 });
 
 feedbackPrevPageButton.addEventListener('click', async () => {
   if (feedbackPage <= 1) return;
+  setButtonLoading(feedbackPrevPageButton, true, 'Loading…');
   try {
     await loadFeedbackExplorer(feedbackPage - 1);
   } catch (error) {
     showToast(error.message, 'error');
+  } finally {
+    // setButtonLoading(false) unconditionally clears .disabled -- re-apply
+    // the pagination-driven state renderFeedbackTable already set, so a
+    // page-1 "Previous" doesn't get incorrectly re-enabled.
+    setButtonLoading(feedbackPrevPageButton, false);
+    feedbackPrevPageButton.disabled = feedbackPage <= 1;
   }
 });
 
 feedbackNextPageButton.addEventListener('click', async () => {
   if (feedbackPage >= feedbackTotalPages) return;
+  setButtonLoading(feedbackNextPageButton, true, 'Loading…');
   try {
     await loadFeedbackExplorer(feedbackPage + 1);
   } catch (error) {
     showToast(error.message, 'error');
+  } finally {
+    setButtonLoading(feedbackNextPageButton, false);
+    feedbackNextPageButton.disabled = feedbackTotalPages === 0 || feedbackPage >= feedbackTotalPages;
   }
 });
 
@@ -936,6 +998,7 @@ feedbackNextPageButton.addEventListener('click', async () => {
 
 if (runLuckyDrawButton) {
   runLuckyDrawButton.addEventListener('click', async () => {
+    setButtonLoading(runLuckyDrawButton, true, 'Loading…');
     try {
       const window_ = currentFortnightWindow(scoreDateInput.value || today);
       luckyDrawFortnightInfo.textContent = window_
@@ -950,6 +1013,8 @@ if (runLuckyDrawButton) {
       luckyDrawModalOverlay.classList.remove('hidden');
     } catch (error) {
       showToast(error.message, 'error');
+    } finally {
+      setButtonLoading(runLuckyDrawButton, false);
     }
   });
 
@@ -960,7 +1025,9 @@ if (runLuckyDrawButton) {
   luckyDrawForm.addEventListener('submit', async (event) => {
     event.preventDefault();
     const doId = parseInt(luckyDrawDoSelect.value, 10);
+    const submitButton = luckyDrawForm.querySelector('button[type=submit]');
 
+    setButtonLoading(submitButton, true, 'Drawing…');
     try {
       const response = await apiFetch('/api/v1/admin/lucky-draw/run', {
         method: 'POST',
@@ -971,6 +1038,8 @@ if (runLuckyDrawButton) {
       await loadLuckyDrawPanel(currentUserContext.role);
     } catch (error) {
       showToast(error.message, 'error');
+    } finally {
+      setButtonLoading(submitButton, false);
     }
   });
 }
@@ -996,7 +1065,9 @@ feedbackDetailBody.addEventListener('click', async (event) => {
   }
 
   const reason = typedReason || 'Reviewed and approved by dashboard staff.';
+  const trigger = approveTrigger || rejectTrigger;
 
+  setButtonLoading(trigger, true, decision === 'APPROVE' ? 'Approving…' : 'Rejecting…');
   try {
     await apiFetch(`/api/v1/admin/feedback/${encodeURIComponent(feedbackId)}/review`, {
       method: 'PATCH',
@@ -1007,6 +1078,7 @@ feedbackDetailBody.addEventListener('click', async (event) => {
     await loadFeedbackExplorer(feedbackPage);
   } catch (error) {
     showToast(error.message, 'error');
+    setButtonLoading(trigger, false);
   }
 });
 
@@ -1021,7 +1093,9 @@ createUserForm.addEventListener('submit', async (event) => {
   const payload = isDoHead
     ? { name, phone, password, role: 'RO_USER', scope_type: 'RO', scope_id: scopeId }
     : { name, phone, password, role: 'DO_ADMIN', scope_type: 'DO', scope_id: scopeId };
+  const submitButton = createUserForm.querySelector('button[type=submit]');
 
+  setButtonLoading(submitButton, true, 'Creating…');
   try {
     await apiFetch('/api/v1/admin/users', { method: 'POST', body: JSON.stringify(payload) });
     showToast(`${isDoHead ? 'Field Officer' : 'Divisional Head'} account created. Share the default password securely -- they can change it after logging in.`);
@@ -1029,5 +1103,7 @@ createUserForm.addEventListener('submit', async (event) => {
     await loadExistingUsers();
   } catch (error) {
     showToast(error.message, 'error');
+  } finally {
+    setButtonLoading(submitButton, false);
   }
 });
