@@ -11,12 +11,17 @@ const apiBase = window.__AIRCARE_API_BASE__ || '';
  * fallback: feedback can only be submitted through an outlet QR URL.
  */
 function resolveRoCode() {
+  // Matched case-insensitively (a customer could hand-type or share a
+  // lowercased URL), then normalized to uppercase before use -- QR codes
+  // are stored as "AIRCARE-XXXXXX" and looked up with an exact match, so
+  // an unnormalized lowercase code would match this regex but still fail
+  // to resolve against the backend.
   const params = new URLSearchParams(window.location.search);
   const fromQuery = params.get('ro_code')?.trim();
-  if (/^AIRCARE-[A-Za-z0-9]+$/i.test(fromQuery || '')) return fromQuery;
+  if (/^AIRCARE-[A-Za-z0-9]+$/i.test(fromQuery || '')) return fromQuery.toUpperCase();
 
-  const pathMatch = window.location.pathname.match(/AIRCARE-[A-Za-z0-9]+/);
-  if (pathMatch) return pathMatch[0];
+  const pathMatch = window.location.pathname.match(/AIRCARE-[A-Za-z0-9]+/i);
+  if (pathMatch) return pathMatch[0].toUpperCase();
 
   return null;
 }
@@ -225,6 +230,24 @@ function captureGpsInBackground() {
   );
 }
 
+// GPS is a hard requirement to submit -- once denied, the browser won't
+// re-prompt from a page script no matter how many times getCurrentPosition
+// is called again, so a customer who denies it (or whose browser blocks it
+// by default) would otherwise hit "Enable location access and try again."
+// forever with no way forward. This distinguishes that case to give
+// actionable guidance instead of a dead-end retry loop.
+async function getGeolocationPermissionState() {
+  if (!navigator.permissions?.query) {
+    return 'unknown';
+  }
+  try {
+    const status = await navigator.permissions.query({ name: 'geolocation' });
+    return status.state; // 'granted' | 'denied' | 'prompt'
+  } catch {
+    return 'unknown';
+  }
+}
+
 async function loadOutlet() {
   if (!roCode) {
     showUnavailableOutlet('Please scan the QR code displayed at an AirCare outlet to submit feedback.');
@@ -277,7 +300,6 @@ mobileForm.addEventListener('submit', async (event) => {
     await checkMobileEligibility(mobileNumber);
     currentMobile = mobileNumber;
     showSurveyStep();
-    captureGpsInBackground();
     showToast('Great. Please complete the feedback form.');
   } catch (error) {
     showToast(error.message, 'error');
@@ -327,8 +349,16 @@ feedbackForm.addEventListener('submit', async (event) => {
   }
 
   if (payload.gps_lat === null || payload.gps_lng === null) {
-    showToast('Enable location access and try again.', 'error');
-    captureGpsInBackground();
+    const permissionState = await getGeolocationPermissionState();
+    if (permissionState === 'denied') {
+      showToast(
+        'Location access is blocked for this site. Open your browser settings (tap the lock or "i" icon in the address bar), allow Location, then reload this page.',
+        'error'
+      );
+    } else {
+      showToast('Still waiting for your location. Please wait a moment and try again.', 'error');
+      captureGpsInBackground();
+    }
     return;
   }
 
@@ -372,3 +402,9 @@ submitAnotherButton.addEventListener('click', () => {
 });
 
 loadOutlet();
+// Fired as early as possible (page load, not after the mobile-number step)
+// so GPS has the whole time the customer spends on the form to resolve,
+// rather than just the survey-filling window -- and so the permission
+// prompt (if the browser shows one) appears before they've invested time
+// filling anything in.
+captureGpsInBackground();
