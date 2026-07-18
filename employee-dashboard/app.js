@@ -45,6 +45,16 @@ const feedbackDetailOverlay = document.getElementById('feedbackDetailOverlay');
 const feedbackDetailTitle = document.getElementById('feedbackDetailTitle');
 const feedbackDetailBody = document.getElementById('feedbackDetailBody');
 const closeFeedbackDetail = document.getElementById('closeFeedbackDetail');
+const weeklyAirStarCard = document.getElementById('weeklyAirStarCard');
+const specialRecognitionList = document.getElementById('specialRecognitionList');
+const luckyDrawPanel = document.getElementById('luckyDrawPanel');
+const luckyDrawWinnersList = document.getElementById('luckyDrawWinnersList');
+const runLuckyDrawButton = document.getElementById('runLuckyDrawButton');
+const luckyDrawModalOverlay = document.getElementById('luckyDrawModalOverlay');
+const luckyDrawForm = document.getElementById('luckyDrawForm');
+const luckyDrawFortnightInfo = document.getElementById('luckyDrawFortnightInfo');
+const luckyDrawDoSelect = document.getElementById('luckyDrawDoSelect');
+const closeLuckyDrawModal = document.getElementById('closeLuckyDrawModal');
 
 let currentUserContext = null; // set after login -- { role, scope_type, scope_id }
 let feedbackPage = 1;
@@ -57,6 +67,37 @@ trendEndInput.value = today;
 trendStartInput.value = new Date(Date.now() - 6 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
 feedbackStartDateInput.value = today;
 feedbackEndDateInput.value = today;
+
+// AirCare Challenge Phase-2 launch date -- anchors Weekly Air Star and
+// Fortnightly Lucky Draw window calculations client-side. Must match
+// CAMPAIGN_START_DATE in app/core/config.py on the backend.
+const CAMPAIGN_START_DATE = '2026-07-16';
+
+function daysBetween(isoA, isoB) {
+  return Math.round((new Date(`${isoB}T00:00:00Z`) - new Date(`${isoA}T00:00:00Z`)) / (24 * 60 * 60 * 1000));
+}
+
+function addDaysIso(isoDate, days) {
+  const date = new Date(`${isoDate}T00:00:00Z`);
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
+}
+
+function currentWeekWindow(todayIso) {
+  const elapsed = daysBetween(CAMPAIGN_START_DATE, todayIso);
+  if (elapsed < 0) return null;
+  const weekIndex = Math.floor(elapsed / 7);
+  const start = addDaysIso(CAMPAIGN_START_DATE, weekIndex * 7);
+  return { start, end: addDaysIso(start, 6) };
+}
+
+function currentFortnightWindow(todayIso) {
+  const elapsed = daysBetween(CAMPAIGN_START_DATE, todayIso);
+  if (elapsed < 0) return null;
+  const fortnightNumber = Math.floor(elapsed / 14) + 1;
+  const start = addDaysIso(CAMPAIGN_START_DATE, (fortnightNumber - 1) * 14);
+  return { fortnightNumber, start, end: addDaysIso(start, 13) };
+}
 
 function showToast(message, type = 'success') {
   toast.textContent = message;
@@ -341,6 +382,54 @@ function renderRollups(stateRollup, divisionalOffices) {
   rollupList.innerHTML = cards.join('');
 }
 
+function renderWeeklyAirStar(winner) {
+  if (!weeklyAirStarCard) return;
+  if (!winner) {
+    weeklyAirStarCard.innerHTML = '<div class="muted">No qualifying outlet yet this week.</div>';
+    return;
+  }
+  weeklyAirStarCard.innerHTML = `
+    <div class="rollup-card">
+      <strong>${escapeHtml(winner.ro_name)}</strong>
+      <div class="muted">${winner.avg_weightage.toFixed(2)} avg Happy Points this week</div>
+    </div>
+  `;
+}
+
+function renderSpecialRecognition(categories) {
+  if (!specialRecognitionList) return;
+  if (!categories.length) {
+    specialRecognitionList.innerHTML = '<div class="muted">No qualifying outlets for the campaign yet.</div>';
+    return;
+  }
+  specialRecognitionList.innerHTML = categories.map((cat) => {
+    const isRate = cat.metric_label.includes('rate');
+    const value = isRate ? `${(cat.metric_value * 100).toFixed(1)}%` : cat.metric_value.toFixed(2);
+    return `
+      <div class="rollup-card">
+        <strong>${escapeHtml(cat.category)}</strong>
+        <div class="muted">${escapeHtml(cat.ro_name)}</div>
+        <div class="muted">${escapeHtml(cat.metric_label.replace(/_/g, ' '))}: ${value}</div>
+      </div>
+    `;
+  }).join('');
+}
+
+function renderLuckyDrawWinners(winners) {
+  if (!luckyDrawWinnersList) return;
+  if (!winners.length) {
+    luckyDrawWinnersList.innerHTML = '<div class="muted">No draws run yet.</div>';
+    return;
+  }
+  luckyDrawWinnersList.innerHTML = winners.map((w) => `
+    <div class="rollup-card">
+      <strong>Fortnight ${w.fortnight_number} • DO ${w.do_id}</strong>
+      <div class="muted">${escapeHtml(w.mobile_number_masked)} • ₹${formatNumber(w.reward_amount)}</div>
+      <div class="muted">${w.fortnight_start} to ${w.fortnight_end}</div>
+    </div>
+  `).join('');
+}
+
 function renderRecentFeedback(items) {
   if (!recentFeedback) {
     return;
@@ -468,6 +557,8 @@ function renderFeedbackDetail(item) {
   ];
 
   const photoUrl = buildPhotoUrl(item.photo_url);
+  const canReview = item.status === 'UNDER_REVIEW' && currentUserContext && currentUserContext.role !== 'RO_USER';
+
   feedbackDetailTitle.textContent = item.ro_name;
   feedbackDetailBody.innerHTML = `
     <div class="feedback-detail-grid">
@@ -486,6 +577,15 @@ function renderFeedbackDetail(item) {
       <div class="feedback-detail-section">
         <span class="detail-label">Photo evidence</span>
         <a class="ghost-button inline-action" href="${escapeHtml(photoUrl)}" target="_blank" rel="noreferrer">Open photo</a>
+      </div>
+    ` : ''}
+    ${canReview ? `
+      <div class="feedback-detail-section">
+        <span class="detail-label">This feedback is flagged for review (anomalous volume vs trailing average)</span>
+        <div class="modal-actions">
+          <button class="ghost-button" type="button" id="rejectFeedbackButton" data-feedback-id="${item.feedback_id}">Reject</button>
+          <button class="primary-button" type="button" id="approveFeedbackButton" data-feedback-id="${item.feedback_id}">Approve</button>
+        </div>
       </div>
     ` : ''}
   `;
@@ -513,6 +613,40 @@ async function loadFeedbackExplorer(page = 1) {
   feedbackPage = response.pagination.page;
   feedbackTotalPages = response.pagination.total_pages;
   renderFeedbackTable(response.data.items, response.pagination);
+}
+
+async function loadAwards(scopeType, todayIso) {
+  // Weekly Air Star / Special Recognition are state-wide rankings -- the
+  // backend restricts them to STATE/DO scope (same as District Air
+  // Champion), so District Admins and Field Officers see a plain message
+  // rather than a failed request.
+  const eligible = scopeType === 'STATE' || scopeType === 'DO';
+  if (!eligible) {
+    if (weeklyAirStarCard) weeklyAirStarCard.innerHTML = '<div class="muted">Not available for your role.</div>';
+    if (specialRecognitionList) specialRecognitionList.innerHTML = '<div class="muted">Not available for your role.</div>';
+    return;
+  }
+
+  const week = currentWeekWindow(todayIso);
+  const [weeklyResponse, specialResponse] = await Promise.all([
+    week
+      ? apiFetch(`/api/v1/dashboard/weekly-air-star?week_start=${week.start}&week_end=${week.end}`)
+      : Promise.resolve({ data: { winner: null } }),
+    apiFetch(`/api/v1/dashboard/special-recognition?start_date=${CAMPAIGN_START_DATE}&end_date=${todayIso}`),
+  ]);
+
+  renderWeeklyAirStar(weeklyResponse.data.winner);
+  renderSpecialRecognition(specialResponse.data.categories);
+}
+
+async function loadLuckyDrawPanel(role) {
+  if (!luckyDrawPanel) return;
+  const canRunDraw = role === 'SUPER_ADMIN' || role === 'STATE_ADMIN';
+  luckyDrawPanel.classList.toggle('hidden', !canRunDraw);
+  if (!canRunDraw) return;
+
+  const response = await apiFetch('/api/v1/admin/lucky-draw/winners');
+  renderLuckyDrawWinners(response.data.winners);
 }
 
 async function loadDashboard() {
@@ -550,6 +684,15 @@ async function loadDashboard() {
   renderRecentFeedback(recentFeedbackResponse.data.items);
   populateFeedbackOutletFilter(feedbackOutletsResponse.data.outlets);
   await loadFeedbackExplorer(1);
+
+  // Award panels are supplementary -- a hiccup here shouldn't block the
+  // core dashboard (metrics/leaderboard/feedback) from having loaded fine.
+  try {
+    await loadAwards(me.data.scope_type, scoreDate || today);
+    await loadLuckyDrawPanel(me.data.role);
+  } catch (error) {
+    console.error('Failed to load award panels', error);
+  }
 }
 
 loginForm.addEventListener('submit', async (event) => {
@@ -776,6 +919,81 @@ feedbackNextPageButton.addEventListener('click', async () => {
   if (feedbackPage >= feedbackTotalPages) return;
   try {
     await loadFeedbackExplorer(feedbackPage + 1);
+  } catch (error) {
+    showToast(error.message, 'error');
+  }
+});
+
+// ---- Fortnightly Lucky Draw ----
+
+if (runLuckyDrawButton) {
+  runLuckyDrawButton.addEventListener('click', async () => {
+    try {
+      const window_ = currentFortnightWindow(scoreDateInput.value || today);
+      luckyDrawFortnightInfo.textContent = window_
+        ? `This will draw for Fortnight ${window_.fortnightNumber}: ${window_.start} to ${window_.end}.`
+        : 'Campaign has not started yet.';
+
+      const rollups = await apiFetch('/api/v1/dashboard/rollups');
+      luckyDrawDoSelect.innerHTML = rollups.data.divisional_offices
+        .map((row) => `<option value="${row.scope_id}">${escapeHtml(row.scope_name)}</option>`)
+        .join('');
+
+      luckyDrawModalOverlay.classList.remove('hidden');
+    } catch (error) {
+      showToast(error.message, 'error');
+    }
+  });
+
+  closeLuckyDrawModal.addEventListener('click', () => {
+    luckyDrawModalOverlay.classList.add('hidden');
+  });
+
+  luckyDrawForm.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const doId = parseInt(luckyDrawDoSelect.value, 10);
+
+    try {
+      const response = await apiFetch('/api/v1/admin/lucky-draw/run', {
+        method: 'POST',
+        body: JSON.stringify({ do_id: doId }),
+      });
+      showToast(`Draw complete: ${response.data.winners.length} winner(s) selected for Fortnight ${response.data.fortnight_number}.`);
+      luckyDrawModalOverlay.classList.add('hidden');
+      await loadLuckyDrawPanel(currentUserContext.role);
+    } catch (error) {
+      showToast(error.message, 'error');
+    }
+  });
+}
+
+// ---- Flagged feedback review (approve/reject from the detail modal) ----
+
+feedbackDetailBody.addEventListener('click', async (event) => {
+  const approveTrigger = event.target.closest('#approveFeedbackButton');
+  const rejectTrigger = event.target.closest('#rejectFeedbackButton');
+  if (!approveTrigger && !rejectTrigger) {
+    return;
+  }
+
+  const feedbackId = (approveTrigger || rejectTrigger).dataset.feedbackId;
+  const decision = approveTrigger ? 'APPROVE' : 'REJECT';
+  const reason = decision === 'REJECT'
+    ? window.prompt('Reason for rejecting this feedback:', 'Suspicious volume pattern')
+    : 'Reviewed and approved by dashboard staff.';
+
+  if (decision === 'REJECT' && !reason) {
+    return; // reviewer cancelled the prompt
+  }
+
+  try {
+    await apiFetch(`/api/v1/admin/feedback/${encodeURIComponent(feedbackId)}/review`, {
+      method: 'PATCH',
+      body: JSON.stringify({ decision, reason }),
+    });
+    showToast(`Feedback ${decision === 'APPROVE' ? 'approved' : 'rejected'}.`);
+    feedbackDetailOverlay.classList.add('hidden');
+    await loadFeedbackExplorer(feedbackPage);
   } catch (error) {
     showToast(error.message, 'error');
   }

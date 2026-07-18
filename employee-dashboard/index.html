@@ -175,6 +175,39 @@
             </div>
           </article>
         </section>
+
+        <section class="insight-grid lower-grid">
+          <article class="panel">
+            <div class="panel-head">
+              <div>
+                <p class="card-label">Weekly recognition</p>
+                <h2>Weekly Air Star</h2>
+              </div>
+            </div>
+            <div id="weeklyAirStarCard" class="rollup-list"></div>
+          </article>
+
+          <article class="panel panel-wide">
+            <div class="panel-head">
+              <div>
+                <p class="card-label">Campaign-to-date</p>
+                <h2>Special Recognition Categories</h2>
+              </div>
+            </div>
+            <div id="specialRecognitionList" class="rollup-list"></div>
+          </article>
+
+          <article class="panel hidden" id="luckyDrawPanel">
+            <div class="panel-head">
+              <div>
+                <p class="card-label">Reward Structure B</p>
+                <h2>Fortnightly Lucky Draw</h2>
+              </div>
+              <button class="ghost-button" id="runLuckyDrawButton" type="button">Run draw</button>
+            </div>
+            <div id="luckyDrawWinnersList" class="rollup-list"></div>
+          </article>
+        </section>
       </section>
 
       <section class="modal-overlay hidden" id="passwordModalOverlay">
@@ -224,6 +257,21 @@
 
           <div id="existingUsersList" class="user-list"></div>
         </div>
+      </section>
+
+      <section class="modal-overlay hidden" id="luckyDrawModalOverlay">
+        <form id="luckyDrawForm" class="modal-card">
+          <h2>Run Fortnightly Lucky Draw</h2>
+          <p class="hint" id="luckyDrawFortnightInfo"></p>
+          <label>
+            Divisional Office
+            <select id="luckyDrawDoSelect"></select>
+          </label>
+          <div class="modal-actions">
+            <button type="button" class="ghost-button" id="closeLuckyDrawModal">Cancel</button>
+            <button type="submit" class="primary-button">Draw 3 Winners</button>
+          </div>
+        </form>
       </section>
 
       <section class="modal-overlay hidden" id="feedbackDetailOverlay">
