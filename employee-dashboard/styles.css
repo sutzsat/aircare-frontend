@@ -122,7 +122,7 @@ h2 {
 .login-panel {
   min-height: calc(100vh - 64px);
   display: grid;
-  grid-template-columns: 1.2fr 0.9fr;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 0.9fr);
   gap: var(--space-6);
   align-items: center;
 }
@@ -169,6 +169,11 @@ label {
   gap: var(--space-2);
   color: var(--ink);
   font-size: 0.95rem;
+  /* Same grid-item min-width:auto trap as .app-shell/.panel above -- labels
+     are grid items throughout (control-bar, feedback-filter-grid, ...) and
+     a native <input type="date">'s intrinsic width was still forcing the
+     row wide even with minmax(0, ...) on the track itself. */
+  min-width: 0;
 }
 
 input,
@@ -203,6 +208,11 @@ textarea:focus {
   font: inherit;
   font-weight: 800;
   cursor: pointer;
+  /* Buttons are flex/grid items throughout the app; padding already gives
+     them a sensible rendered minimum, so the default content-based
+     min-width floor (the same recurring trap as .app-shell/.panel/label
+     above) only ever causes overflow, never protects anything here. */
+  min-width: 0;
 }
 
 .primary-button {
@@ -258,6 +268,17 @@ textarea:focus {
 .app-shell {
   display: grid;
   gap: var(--space-5);
+}
+
+.app-shell > * {
+  /* Grid items default to min-width: auto, which floors a track at its
+     content's min-content size -- one wide row (e.g. a panel containing a
+     wide table) was dragging every sibling row (hero banner, control bar,
+     metric grid, ...) wider than the viewport along with it, since they
+     all share app-shell's single implicit column track. Same root cause
+     as the mobile breakpoint overflow bug, just at the desktop width just
+     above 1100px where the mobile override doesn't apply. */
+  min-width: 0;
 }
 
 .hero-banner {
@@ -322,17 +343,24 @@ textarea:focus {
 
 .insight-grid {
   display: grid;
-  grid-template-columns: 1.35fr 0.8fr 0.8fr;
+  grid-template-columns: minmax(0, 1.35fr) minmax(0, 0.8fr) minmax(0, 0.8fr);
   gap: var(--space-4);
 }
 
 .lower-grid {
-  grid-template-columns: 1.35fr 0.8fr 0.8fr;
+  grid-template-columns: minmax(0, 1.35fr) minmax(0, 0.8fr) minmax(0, 0.8fr);
 }
 
 .panel {
   border-radius: var(--radius-xl);
   padding: var(--space-6);
+  /* Panels are always grid items (insight-grid/lower-grid). Without this,
+     a panel still defaults to min-width: auto and grows to fit a wide
+     child's content (e.g. the feedback table) instead of respecting its
+     grid track -- which also means .table-shell's own overflow-x: auto
+     below never gets a chance to clip/scroll, since its ancestor already
+     grew to make room instead. */
+  min-width: 0;
 }
 
 .panel-wide {
@@ -366,7 +394,14 @@ textarea:focus {
 
 .feedback-filter-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  /* Always single-column, not just below the 1100px breakpoint. This grid
+     lives in the narrowest of the three lower-grid columns (0.8fr share) --
+     even at the container's max width (1320px), splitting it into 2
+     columns leaves less room than a native date input's rendering minimum
+     needs, causing overflow that only shrinks (never fully resolves) as
+     the viewport grows, since the container itself stops growing past
+     1320px. Single-column sidesteps the fragile width math entirely. */
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--space-3);
   margin-bottom: var(--space-3);
 }
@@ -383,6 +418,13 @@ textarea:focus {
 .feedback-pagination {
   justify-content: space-between;
   margin-bottom: var(--space-4);
+}
+
+.feedback-pagination > * {
+  /* Same min-width:auto trap, flexbox flavor -- the "Showing X-Y of Z"
+     summary text was flooring this row's shrink and pushing Previous/Next
+     past the edge. min-width: 0 lets it wrap instead. */
+  min-width: 0;
 }
 
 .table-secondary {
@@ -430,7 +472,7 @@ textarea:focus {
 }
 
 .issue-row {
-  grid-template-columns: 1.2fr 3fr auto;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 3fr) auto;
   align-items: center;
 }
 
@@ -606,10 +648,6 @@ th {
   }
 
   .feedback-detail-grid {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .feedback-filter-grid {
     grid-template-columns: minmax(0, 1fr);
   }
 
