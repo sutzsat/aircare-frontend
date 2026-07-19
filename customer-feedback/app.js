@@ -2,13 +2,14 @@ const apiBase = window.__AIRCARE_API_BASE__ || '';
 
 /**
  * Reads the RO code from either URL format:
- * - Query param: ?ro_code=AIRCARE-219578 (this app's original design)
- * - Path segment: /feedback/AIRCARE-219578 (the format already baked into
- *   the 127 printed QR codes -- see qr-codes/README.md in the backend repo)
+ * - Query param: ?ro_code=AIRCARE-219578 (this app's original design, and
+ *   the format actually encoded in the 127 printed QR codes -- see
+ *   artifacts/qr/index.csv in the backend repo)
+ * - Path segment: /feedback/AIRCARE-219578 (kept as a fallback in case any
+ *   QR pack is regenerated in path mode in the future)
  *
- * Both are supported so the already-generated QR designs work without
- * needing to be regenerated or reprinted. There is intentionally no
- * fallback: feedback can only be submitted through an outlet QR URL.
+ * There is intentionally no other fallback: feedback can only be submitted
+ * through an outlet QR URL.
  */
 function resolveRoCode() {
   // Matched case-insensitively (a customer could hand-type or share a
