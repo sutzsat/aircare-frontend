@@ -61,14 +61,6 @@
             Score date
             <input id="scoreDate" type="date" />
           </label>
-          <label>
-            Trend start
-            <input id="trendStart" type="date" />
-          </label>
-          <label>
-            Trend end
-            <input id="trendEnd" type="date" />
-          </label>
           <button class="primary-button" id="refreshButton" type="button">Refresh</button>
         </section>
 
@@ -80,6 +72,16 @@
               <div>
                 <p class="card-label">Campaign trend</p>
                 <h2>Happy Points over time</h2>
+              </div>
+              <div class="panel-head-controls">
+                <label>
+                  From
+                  <input id="trendStart" type="date" />
+                </label>
+                <label>
+                  To
+                  <input id="trendEnd" type="date" />
+                </label>
               </div>
             </div>
             <div id="trendChart" class="chart-card"></div>
@@ -106,15 +108,25 @@
           </article>
         </section>
 
-        <section class="insight-grid lower-grid">
+        <section class="insight-grid lower-grid two-col">
           <article class="panel panel-wide">
             <div class="panel-head">
               <div>
                 <p class="card-label">Leaderboard</p>
                 <h2>Top outlets</h2>
               </div>
+              <label class="inline-select">
+                Show top
+                <select id="leaderboardLimit">
+                  <option value="5">5</option>
+                  <option value="10">10</option>
+                  <option value="20">20</option>
+                  <option value="50">50</option>
+                  <option value="100">100</option>
+                </select>
+              </label>
             </div>
-            <div id="leaderboardTable" class="table-shell"></div>
+            <div id="leaderboardTable" class="table-shell scrollable-table"></div>
           </article>
 
           <article class="panel">
@@ -125,54 +137,6 @@
               </div>
             </div>
             <div id="rollupList" class="rollup-list"></div>
-          </article>
-
-          <article class="panel">
-            <div class="panel-head">
-              <div>
-                <p class="card-label">Latest responses</p>
-                <h2>Individual feedback</h2>
-              </div>
-            </div>
-            <div id="recentFeedback" class="feedback-list"></div>
-            <div class="feedback-filter-grid">
-              <label>
-                From date
-                <input id="feedbackStartDate" type="date" />
-              </label>
-              <label>
-                To date
-                <input id="feedbackEndDate" type="date" />
-              </label>
-              <label>
-                Status
-                <select id="feedbackStatusFilter">
-                  <option value="">All statuses</option>
-                  <option value="VALID">Valid</option>
-                  <option value="FLAGGED">Flagged</option>
-                  <option value="REJECTED">Rejected</option>
-                  <option value="UNDER_REVIEW">Under review</option>
-                </select>
-              </label>
-              <label>
-                Outlet
-                <select id="feedbackOutletFilter">
-                  <option value="">All outlets</option>
-                </select>
-              </label>
-            </div>
-            <div class="feedback-filter-actions">
-              <button class="primary-button" id="applyFeedbackFilters" type="button">Apply filters</button>
-              <button class="ghost-button" id="resetFeedbackFilters" type="button">Reset</button>
-            </div>
-            <div id="feedbackTable" class="table-shell"></div>
-            <div class="feedback-pagination">
-              <div class="muted" id="feedbackPaginationSummary">No feedback loaded.</div>
-              <div class="feedback-pagination-actions">
-                <button class="ghost-button" id="feedbackPrevPage" type="button">Previous</button>
-                <button class="ghost-button" id="feedbackNextPage" type="button">Next</button>
-              </div>
-            </div>
           </article>
         </section>
 
@@ -205,8 +169,56 @@
               </div>
               <button class="ghost-button" id="runLuckyDrawButton" type="button">Run draw</button>
             </div>
-            <div id="luckyDrawWinnersList" class="rollup-list"></div>
+            <div id="luckyDrawWinnersList" class="rollup-list scrollable-list"></div>
           </article>
+        </section>
+
+        <section class="panel full-width-panel">
+          <div class="panel-head">
+            <div>
+              <p class="card-label">Latest responses</p>
+              <h2>Individual feedback</h2>
+            </div>
+          </div>
+          <div id="recentFeedback" class="feedback-list"></div>
+          <div class="feedback-filter-grid">
+            <label>
+              From date
+              <input id="feedbackStartDate" type="date" />
+            </label>
+            <label>
+              To date
+              <input id="feedbackEndDate" type="date" />
+            </label>
+            <label>
+              Status
+              <select id="feedbackStatusFilter">
+                <option value="">All statuses</option>
+                <option value="VALID">Valid</option>
+                <option value="FLAGGED">Flagged</option>
+                <option value="REJECTED">Rejected</option>
+                <option value="UNDER_REVIEW">Under review</option>
+              </select>
+            </label>
+            <label>
+              Outlet
+              <select id="feedbackOutletFilter">
+                <option value="">All outlets</option>
+              </select>
+            </label>
+          </div>
+          <div class="feedback-filter-actions">
+            <button class="primary-button" id="applyFeedbackFilters" type="button">Apply filters</button>
+            <button class="ghost-button" id="resetFeedbackFilters" type="button">Reset</button>
+          </div>
+          <div id="feedbackTable" class="table-shell"></div>
+          <div class="feedback-pagination">
+            <div class="muted" id="feedbackPaginationSummary">No feedback loaded.</div>
+            <div class="feedback-pagination-actions">
+              <button class="ghost-button" id="feedbackPrevPage" type="button">Previous</button>
+              <button class="ghost-button" id="feedbackNextPage" type="button">Next</button>
+            </div>
+          </div>
         </section>
       </section>
 

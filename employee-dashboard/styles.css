@@ -259,7 +259,8 @@ textarea:focus {
 }
 
 .app-shell.is-loading .metric-grid,
-.app-shell.is-loading .insight-grid {
+.app-shell.is-loading .insight-grid,
+#leaderboardTable.is-loading {
   opacity: 0.5;
   pointer-events: none;
   transition: opacity 160ms ease;
@@ -312,10 +313,44 @@ textarea:focus {
 .control-bar {
   border-radius: var(--radius-xl);
   padding: var(--space-4);
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  display: flex;
+  flex-wrap: wrap;
   gap: var(--space-3);
   align-items: end;
+}
+
+.control-bar label {
+  width: min(240px, 100%);
+}
+
+.panel-head-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  align-items: end;
+}
+
+.panel-head-controls label,
+.inline-select {
+  display: grid;
+  gap: var(--space-1);
+  color: var(--muted);
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 700;
+  min-width: 0;
+}
+
+.panel-head-controls input,
+.inline-select select {
+  width: auto;
+  padding: var(--space-2) var(--space-3);
+  font-size: 0.88rem;
+  text-transform: none;
+  letter-spacing: normal;
+  font-weight: 500;
+  color: var(--ink);
 }
 
 .metric-grid {
@@ -351,6 +386,31 @@ textarea:focus {
   grid-template-columns: minmax(0, 1.35fr) minmax(0, 0.8fr) minmax(0, 0.8fr);
 }
 
+.lower-grid.two-col {
+  grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
+}
+
+.scrollable-table {
+  max-height: 420px;
+  overflow-y: auto;
+}
+
+.scrollable-table thead th {
+  position: sticky;
+  top: 0;
+  background: var(--surface-solid);
+}
+
+.scrollable-list {
+  /* Caps a long, unbounded list (e.g. every Lucky Draw winner across every
+     fortnight) so it doesn't tower over shorter panels sharing its row and
+     leave them looking sparse by comparison -- same fix as the leaderboard,
+     scoped to whichever list actually grows unbounded. */
+  max-height: 420px;
+  overflow-y: auto;
+  padding-right: var(--space-1);
+}
+
 .panel {
   border-radius: var(--radius-xl);
   padding: var(--space-6);
@@ -369,7 +429,9 @@ textarea:focus {
 
 .panel-head {
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
+  align-items: flex-start;
   gap: var(--space-3);
   margin-bottom: var(--space-4);
 }
@@ -394,16 +456,18 @@ textarea:focus {
 
 .feedback-filter-grid {
   display: grid;
-  /* Always single-column, not just below the 1100px breakpoint. This grid
-     lives in the narrowest of the three lower-grid columns (0.8fr share) --
-     even at the container's max width (1320px), splitting it into 2
-     columns leaves less room than a native date input's rendering minimum
-     needs, causing overflow that only shrinks (never fully resolves) as
-     the viewport grows, since the container itself stops growing past
-     1320px. Single-column sidesteps the fragile width math entirely. */
-  grid-template-columns: minmax(0, 1fr);
+  /* This panel is now a full-width section (moved out of the cramped
+     lower-grid column it used to share with Leaderboard/Rollups), so a
+     native date input's rendering minimum comfortably fits multiple
+     columns instead of needing the single-column fallback that used to
+     live here. */
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   gap: var(--space-3);
   margin-bottom: var(--space-3);
+}
+
+.feedback-list {
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
 }
 
 .feedback-filter-actions,
@@ -432,12 +496,49 @@ textarea:focus {
   font-size: 0.84rem;
 }
 
+.chart-card {
+  position: relative;
+}
+
 .trend-svg {
   width: 100%;
   height: 260px;
   border-radius: var(--radius-lg);
   background: var(--trend-bg);
   border: 1px solid var(--line-soft);
+}
+
+.trend-point {
+  cursor: pointer;
+}
+
+.trend-point-hit {
+  fill: transparent;
+}
+
+.trend-tooltip {
+  position: absolute;
+  pointer-events: none;
+  transform: translate(-50%, -100%);
+  background: rgba(39, 24, 16, 0.94);
+  color: #fff8f0;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow);
+  font-size: 0.82rem;
+  white-space: nowrap;
+  opacity: 0;
+  transition: opacity 120ms ease;
+  z-index: 5;
+}
+
+.trend-tooltip.show {
+  opacity: 1;
+}
+
+.trend-tooltip strong {
+  font-family: "Space Grotesk", sans-serif;
+  font-size: 1rem;
 }
 
 .stack-bar {
@@ -474,6 +575,13 @@ textarea:focus {
 .issue-row {
   grid-template-columns: minmax(0, 1.2fr) minmax(0, 3fr) auto;
   align-items: center;
+}
+
+.issue-row > div {
+  /* Same grid-item min-width:auto trap as elsewhere in this file -- an
+     unbreakable word like "Availability"/"Promptness" would otherwise
+     overflow its track and visually sit under the bar next to it. */
+  min-width: 0;
 }
 
 .issue-track {
@@ -635,8 +743,13 @@ th {
   .metric-grid,
   .insight-grid,
   .lower-grid,
+  .lower-grid.two-col,
   .control-bar {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .control-bar label {
+    width: 100%;
   }
 
   .hero-banner {

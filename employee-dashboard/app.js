@@ -16,6 +16,7 @@ const trendChart = document.getElementById('trendChart');
 const recommendationChart = document.getElementById('recommendationChart');
 const issueChart = document.getElementById('issueChart');
 const leaderboardTable = document.getElementById('leaderboardTable');
+const leaderboardLimitInput = document.getElementById('leaderboardLimit');
 const rollupList = document.getElementById('rollupList');
 const recentFeedback = document.getElementById('recentFeedback');
 const feedbackTable = document.getElementById('feedbackTable');
@@ -62,11 +63,18 @@ let feedbackTotalPages = 0;
 let feedbackPageSize = 10;
 
 const today = new Date().toISOString().slice(0, 10);
-scoreDateInput.value = today;
-trendEndInput.value = today;
-trendStartInput.value = new Date(Date.now() - 6 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
-feedbackStartDateInput.value = today;
-feedbackEndDateInput.value = today;
+// Default the reporting views to the last FULLY SCORED day, not the
+// still-in-progress current day. Daily scoring runs once at 23:59 (see
+// app/tasks/celery_app.py) -- Leaderboard, Rollups, and Trend all read
+// from that pre-computed daily score, so defaulting to "today" means a
+// State Head logging in at any point before midnight sees every one of
+// those panels blank. Yesterday is always fully scored.
+const defaultReportDate = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+scoreDateInput.value = defaultReportDate;
+trendEndInput.value = defaultReportDate;
+trendStartInput.value = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+feedbackStartDateInput.value = defaultReportDate;
+feedbackEndDateInput.value = defaultReportDate;
 
 // AirCare Challenge Phase-2 launch date -- anchors Weekly Air Star and
 // Fortnightly Lucky Draw window calculations client-side. Must match
@@ -267,9 +275,22 @@ function escapeHtml(value) {
   return div.innerHTML;
 }
 
-function renderMetrics(metrics) {
+function formatShortDate(isoDate) {
+  const date = new Date(`${isoDate}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return isoDate;
+  return new Intl.DateTimeFormat('en-IN', { day: 'numeric', month: 'short' }).format(date);
+}
+
+function renderMetrics(metrics, scoreDate) {
+  // Labeled with the actual selected date, not a hardcoded "today" -- the
+  // dashboard defaults to yesterday (see defaultReportDate above), so a
+  // fixed "today" label would silently show yesterday's count under the
+  // wrong name. Accurate for whatever date is picked, including if someone
+  // manually selects today and it's genuinely still zero pre-scoring.
+  const dateLabel = formatShortDate(scoreDate);
   const cards = [
-    ['Total feedback', formatNumber(metrics.total_feedback)],
+    [`Feedback received (${dateLabel})`, formatNumber(metrics.total_feedback)],
+    ['Total feedback (all-time)', formatNumber(metrics.cumulative_total_feedback)],
     ['Qualified outlets', formatNumber(metrics.qualified_outlets)],
     ['Average Happy Points', metrics.average_happy_points.toFixed(2)],
     ['Average satisfaction score', metrics.average_satisfaction_score.toFixed(2)],
@@ -281,7 +302,6 @@ function renderMetrics(metrics) {
 
   metricGrid.innerHTML = cards.map(([label, value]) => `
     <article class="metric-card">
-      <p class="card-label">Snapshot</p>
       <strong>${value}</strong>
       <span>${label}</span>
     </article>
@@ -357,12 +377,39 @@ function renderTrendChart(trendRows) {
       </defs>
       <polygon points="${area}" fill="url(#trendFill)"></polygon>
       <polyline points="${polyline}" fill="none" stroke="#d2601a" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"></polyline>
-      ${points.map((point) => `<circle cx="${point.x}" cy="${point.y}" r="5" fill="#7a2e0a"></circle>`).join('')}
+      ${points.map((point) => `<circle class="trend-point" cx="${point.x}" cy="${point.y}" r="5" fill="#7a2e0a"></circle>`).join('')}
+      ${points.map((point) => `<circle class="trend-point-hit" cx="${point.x}" cy="${point.y}" r="16" data-date="${point.score_date}" data-value="${point.average_happy_points}"></circle>`).join('')}
     </svg>
-    <div class="legend-row">
-      ${points.map((point) => `<div class="legend-pill"><strong>${point.average_happy_points.toFixed(1)}</strong><div class="muted">${point.score_date}</div></div>`).join('')}
-    </div>
+    <div class="trend-tooltip" id="trendTooltip"></div>
   `;
+
+  // Hover a point to see that day's value -- replaces the old always-visible
+  // legend grid below the chart, which ate a lot of vertical space and made
+  // panels next to/below it look sparse by comparison.
+  const svgEl = trendChart.querySelector('.trend-svg');
+  const tooltipEl = trendChart.querySelector('#trendTooltip');
+
+  function positionTooltip(hit) {
+    const cx = parseFloat(hit.getAttribute('cx'));
+    const cy = parseFloat(hit.getAttribute('cy'));
+    const rect = svgEl.getBoundingClientRect();
+    const scaleX = rect.width / width;
+    const scaleY = rect.height / height;
+    tooltipEl.style.left = `${cx * scaleX}px`;
+    tooltipEl.style.top = `${cy * scaleY - 12}px`;
+  }
+
+  trendChart.querySelectorAll('.trend-point-hit').forEach((hit) => {
+    hit.addEventListener('mouseenter', () => {
+      tooltipEl.innerHTML = `<strong>${parseFloat(hit.dataset.value).toFixed(1)}</strong><div>${hit.dataset.date}</div>`;
+      tooltipEl.classList.add('show');
+      positionTooltip(hit);
+    });
+    hit.addEventListener('mousemove', () => positionTooltip(hit));
+    hit.addEventListener('mouseleave', () => {
+      tooltipEl.classList.remove('show');
+    });
+  });
 }
 
 function renderLeaderboard(rows) {
@@ -379,9 +426,9 @@ function renderLeaderboard(rows) {
         </tr>
       </thead>
       <tbody>
-        ${rows.map((row) => `
+        ${rows.map((row, index) => `
           <tr>
-            <td><span class="rank-badge">${row.rank ?? 'NQ'}</span></td>
+            <td><span class="rank-badge">${row.rank != null ? index + 1 : 'NQ'}</span></td>
             <td>${escapeHtml(row.ro_name)}</td>
             <td>${escapeHtml(row.district)}</td>
             <td>${escapeHtml(row.divisional_office)}</td>
@@ -686,7 +733,7 @@ async function loadDashboard() {
     const [me, overview, leaderboard, trend, rollups, recentFeedbackResponse, feedbackOutletsResponse] = await Promise.all([
       apiFetch('/api/v1/dashboard/me'),
       apiFetch(`/api/v1/dashboard/overview?score_date=${encodeURIComponent(scoreDate)}`),
-      apiFetch(`/api/v1/dashboard/leaderboard?score_date=${encodeURIComponent(scoreDate)}&limit=10`),
+      apiFetch(`/api/v1/dashboard/leaderboard?score_date=${encodeURIComponent(scoreDate)}&limit=${encodeURIComponent(leaderboardLimitInput.value)}`),
       apiFetch(`/api/v1/dashboard/trend?start_date=${encodeURIComponent(trendStart)}&end_date=${encodeURIComponent(trendEnd)}`),
       apiFetch(`/api/v1/dashboard/rollups?score_date=${encodeURIComponent(scoreDate)}`),
       apiFetch(`/api/v1/dashboard/recent-feedback?score_date=${encodeURIComponent(scoreDate)}&limit=12`),
@@ -704,7 +751,7 @@ async function loadDashboard() {
     const canManageUsers = ['SUPER_ADMIN', 'STATE_ADMIN', 'DO_ADMIN'].includes(me.data.role);
     manageUsersButton.classList.toggle('hidden', !canManageUsers);
 
-    renderMetrics(overview.data.metrics);
+    renderMetrics(overview.data.metrics, scoreDate);
     renderRecommendationChart(overview.data.recommendation_split);
     renderIssueChart(overview.data.issue_hotspots);
     renderTrendChart(trend.data.trend);
@@ -749,6 +796,20 @@ loginForm.addEventListener('submit', async (event) => {
     showToast(error.message, 'error');
   } finally {
     setButtonLoading(signInButton, false);
+  }
+});
+
+leaderboardLimitInput.addEventListener('change', async () => {
+  leaderboardTable.classList.add('is-loading');
+  try {
+    const response = await apiFetch(
+      `/api/v1/dashboard/leaderboard?score_date=${encodeURIComponent(scoreDateInput.value)}&limit=${encodeURIComponent(leaderboardLimitInput.value)}`,
+    );
+    renderLeaderboard(response.data.leaderboard);
+  } catch (error) {
+    showToast(error.message, 'error');
+  } finally {
+    leaderboardTable.classList.remove('is-loading');
   }
 });
 
