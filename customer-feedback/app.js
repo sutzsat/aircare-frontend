@@ -288,6 +288,9 @@ async function checkMobileEligibility(mobileNumber) {
 
 mobileForm.addEventListener('submit', async (event) => {
   event.preventDefault();
+  // First user gesture in the flow -- see the comment near loadOutlet() for
+  // why this can't just run at page load.
+  captureGpsInBackground();
   const mobileNumber = mobileNumberInput.value.trim();
   if (!/^\d{10}$/.test(mobileNumber)) {
     showToast('Enter a valid 10-digit mobile number.', 'error');
@@ -403,9 +406,10 @@ submitAnotherButton.addEventListener('click', () => {
 });
 
 loadOutlet();
-// Fired as early as possible (page load, not after the mobile-number step)
-// so GPS has the whole time the customer spends on the form to resolve,
-// rather than just the survey-filling window -- and so the permission
-// prompt (if the browser shows one) appears before they've invested time
-// filling anything in.
-captureGpsInBackground();
+// NOT fired here at raw page load: iOS Safari silently suppresses the
+// geolocation permission prompt (no dialog, no error -- it just never
+// resolves) when the first request isn't triggered by a user gesture, and
+// won't reliably show it on a later gesture-triggered call either once that
+// happens. It's fired instead on the mobile-number form's submit handler
+// below -- the earliest real tap in the flow -- so GPS still has the whole
+// survey-filling window to resolve, but from inside a genuine user gesture.
